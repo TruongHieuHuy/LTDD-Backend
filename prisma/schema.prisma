@@ -1,0 +1,280 @@
+// Prisma Schema for Game Mobile Backend
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER MODEL ====================
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique @db.VarChar(20)
+  email     String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(255)
+  avatarUrl String?  @db.VarChar(500)
+  
+  // Statistics
+  totalGamesPlayed Int @default(0)
+  totalScore       Int @default(0)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  lastLoginAt DateTime @default(now())
+  
+  // Relations
+  gameScores GameScore[]
+  
+  // Friend relations
+  friendRequestsSent     FriendRequest[] @relation("SentRequests")
+  friendRequestsReceived FriendRequest[] @relation("ReceivedRequests")
+  friendships1           Friendship[]    @relation("User1Friendships")
+  friendships2           Friendship[]    @relation("User2Friendships")
+  
+  // Chat relations
+  messagesSent     Message[] @relation("SentMessages")
+  messagesReceived Message[] @relation("ReceivedMessages")
+  
+  // Post relations
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  savedPosts   SavedPost[]
+  followers    Follow[]    @relation("Following")
+  following    Follow[]    @relation("Followers")
+  
+  @@map("users")
+}
+
+// ==================== GAME SCORE MODEL ====================
+model GameScore {
+  id         String   @id @default(uuid())
+  userId     String
+  gameType   GameType
+  score      Int
+  attempts   Int      @default(1)
+  difficulty Difficulty
+  timeSpent  Int      @default(0) // seconds
+  
+  // Game-specific data (JSON for flexibility)
+  gameData   Json?    @db.JsonB
+  
+  // Sync metadata
+  version    Int      @default(1)
+  syncedAt   DateTime?
+  
+  // Timestamps
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Indexes for fast queries
+  @@index([userId, gameType, createdAt(sort: Desc)])
+  @@index([gameType, score(sort: Desc)]) // For leaderboard
+  @@map("game_scores")
+}
+
+// ==================== FRIEND REQUEST MODEL ====================
+model FriendRequest {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  message    String?  @db.VarChar(500)
+  status     RequestStatus @default(pending)
+  
+  // Timestamps
+  sentAt       DateTime @default(now())
+  respondedAt  DateTime?
+  
+  // Relations
+  sender   User @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@map("friend_requests")
+}
+
+// ==================== FRIENDSHIP MODEL ====================
+model Friendship {
+  id        String   @id @default(uuid())
+  userId1   String   // Always smaller ID
+  userId2   String   // Always larger ID
+  
+  // Block status
+  isBlocked Boolean @default(false)
+  blockedBy String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user1 User @relation("User1Friendships", fields: [userId1], references: [id], onDelete: Cascade)
+  user2 User @relation("User2Friendships", fields: [userId2], references: [id], onDelete: Cascade)
+  
+  @@unique([userId1, userId2])
+  @@map("friendships")
+}
+
+// ==================== MESSAGE MODEL ====================
+model Message {
+  id         String      @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String      @db.Text
+  type       MessageType @default(text)
+  isRead     Boolean     @default(false)
+  
+  // Timestamps
+  sentAt DateTime @default(now())
+  readAt DateTime?
+  
+  // Relations
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@index([senderId, receiverId, sentAt(sort: Desc)])
+  @@index([receiverId, isRead])
+  @@map("messages")
+}
+
+// ==================== ENUMS ====================
+enum GameType {
+  rubik
+  sudoku
+  caro
+  puzzle
+}
+
+enum Difficulty {
+  easy
+  medium
+  hard
+  expert
+}
+
+enum RequestStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum MessageType {
+  text
+  image
+  file
+}
+
+// ==================== POST MODEL ====================
+model Post {
+  id          String    @id @default(uuid())
+  userId      String
+  content     String    @db.Text
+  imageUrl    String?   @db.VarChar(500)
+  visibility  PostVisibility @default(public)
+  
+  // Counts
+  likeCount    Int @default(0)
+  commentCount Int @default(0)
+  shareCount   Int @default(0)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments   Comment[]
+  likes      Like[]
+  savedBy    SavedPost[]
+  
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+// ==================== COMMENT MODEL ====================
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  content   String   @db.Text
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+// ==================== LIKE MODEL ====================
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("likes")
+}
+
+// ==================== SAVED POST MODEL ====================
+model SavedPost {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  
+  // Timestamps
+  savedAt DateTime @default(now())
+  
+  // Relations
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([postId, userId])
+  @@index([userId, savedAt(sort: Desc)])
+  @@map("saved_posts")
+}
+
+// ==================== FOLLOW MODEL ====================
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  follower  User @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+enum PostVisibility {
+  public
+  friends
+  private
+}
