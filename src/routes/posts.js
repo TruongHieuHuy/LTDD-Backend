@@ -191,6 +191,11 @@ router.get('/:postId', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
+    console.log('GET post:', postId, 'comments count:', post.comments?.length);
+    if (post.comments) {
+      console.log('Comments:', post.comments.map(c => ({ id: c.id, content: c.content })));
+    }
+
     // Check if user liked
     const userLike = await prisma.like.findUnique({
       where: {
@@ -395,12 +400,15 @@ router.post('/:postId/comments', async (req, res) => {
       },
     });
 
+    console.log('Comment created:', comment.id, 'for post:', postId);
+
     // Increment comment count
     await prisma.post.update({
       where: { id: postId },
       data: { commentCount: { increment: 1 } },
     });
 
+    console.log('Returning comment:', JSON.stringify(comment));
     res.status(201).json(comment);
   } catch (error) {
     console.error('Add comment error:', error);
