@@ -15,10 +15,16 @@ const prisma = new PrismaClient();
 router.post('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { content, imageUrl, visibility = 'public' } = req.body;
+    const { content, imageUrl, visibility = 'public', category } = req.body;
 
     if (!content || content.trim().length === 0) {
       return res.status(400).json({ error: 'Content is required' });
+    }
+
+    // Validate category if provided
+    const validCategories = ['SUDOKU', 'CARO', 'RUBIK', 'PUZZLE', 'CHESS', 'GAME_2048', 'MEMORY', 'QUIZ'];
+    if (category && !validCategories.includes(category)) {
+      return res.status(400).json({ error: 'Invalid category' });
     }
 
     const post = await prisma.post.create({
@@ -27,6 +33,7 @@ router.post('/', async (req, res) => {
         content,
         imageUrl,
         visibility,
+        category: category || null,
       },
       include: {
         user: {
@@ -51,21 +58,42 @@ router.post('/', async (req, res) => {
 /**
  * GET /api/posts
  * Get posts feed (all public posts + friends' posts)
+ * Query params: limit, offset, userId, category, search (username or content)
  */
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { limit = 20, offset = 0, userId: filterUserId } = req.query;
+    const { limit = 20, offset = 0, userId: filterUserId, category, search } = req.query;
 
     // Build where clause
-    const where = filterUserId
-      ? { userId: filterUserId } // Filter by specific user
-      : {
-          OR: [
-            { visibility: 'public' },
-            { userId }, // Own posts
-          ],
-        };
+    let where = {};
+
+    // Filter by specific user
+    if (filterUserId) {
+      where.userId = filterUserId;
+    } else {
+      // Visibility filter
+      where.OR = [
+        { visibility: 'public' },
+        { userId }, // Own posts
+      ];
+    }
+
+    // Category filter
+    if (category) {
+      where.category = category;
+    }
+
+    // Search by username or content
+    if (search) {
+      const searchWhere = {
+        OR: [
+          { content: { contains: search, mode: 'insensitive' } },
+          { user: { username: { contains: search, mode: 'insensitive' } } },
+        ],
+      };
+      where = { AND: [where, searchWhere] };
+    }
 
     const posts = await prisma.post.findMany({
       where,
