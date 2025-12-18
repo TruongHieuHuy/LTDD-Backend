@@ -178,6 +178,7 @@ model Post {
   content     String    @db.Text
   imageUrl    String?   @db.VarChar(500)
   visibility  PostVisibility @default(public)
+  category    GameType? // Game category for filtering
   
   // Counts
   likeCount    Int @default(0)
@@ -195,6 +196,7 @@ model Post {
   savedBy    SavedPost[]
   
   @@index([userId, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
   @@map("posts")
 }
 

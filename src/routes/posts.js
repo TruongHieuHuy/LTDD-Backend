@@ -15,10 +15,16 @@ const prisma = new PrismaClient();
 router.post('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { content, imageUrl, visibility = 'public' } = req.body;
+    const { content, imageUrl, visibility = 'public', category } = req.body;
 
     if (!content || content.trim().length === 0) {
       return res.status(400).json({ error: 'Content is required' });
+    }
+
+    // Validate category if provided (must match GameType enum in schema)
+    const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
+    if (category && !validCategories.includes(category)) {
+      return res.status(400).json({ error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' });
     }
 
     const post = await prisma.post.create({
@@ -27,6 +33,7 @@ router.post('/', async (req, res) => {
         content,
         imageUrl,
         visibility,
+        category: category || null,
       },
       include: {
         user: {
@@ -51,21 +58,42 @@ router.post('/', async (req, res) => {
 /**
  * GET /api/posts
  * Get posts feed (all public posts + friends' posts)
+ * Query params: limit, offset, userId, category, search (username or content)
  */
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { limit = 20, offset = 0, userId: filterUserId } = req.query;
+    const { limit = 20, offset = 0, userId: filterUserId, category, search } = req.query;
 
     // Build where clause
-    const where = filterUserId
-      ? { userId: filterUserId } // Filter by specific user
-      : {
-          OR: [
-            { visibility: 'public' },
-            { userId }, // Own posts
-          ],
-        };
+    let where = {};
+
+    // Filter by specific user
+    if (filterUserId) {
+      where.userId = filterUserId;
+    } else {
+      // Visibility filter
+      where.OR = [
+        { visibility: 'public' },
+        { userId }, // Own posts
+      ];
+    }
+
+    // Category filter
+    if (category) {
+      where.category = category;
+    }
+
+    // Search by username or content
+    if (search) {
+      const searchWhere = {
+        OR: [
+          { content: { contains: search, mode: 'insensitive' } },
+          { user: { username: { contains: search, mode: 'insensitive' } } },
+        ],
+      };
+      where = { AND: [where, searchWhere] };
+    }
 
     const posts = await prisma.post.findMany({
       where,
@@ -163,6 +191,11 @@ router.get('/:postId', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
+    console.log('GET post:', postId, 'comments count:', post.comments?.length);
+    if (post.comments) {
+      console.log('Comments:', post.comments.map(c => ({ id: c.id, content: c.content })));
+    }
+
     // Check if user liked
     const userLike = await prisma.like.findUnique({
       where: {
@@ -195,7 +228,7 @@ router.put('/:postId', async (req, res) => {
   try {
     const userId = req.user.id;
     const { postId } = req.params;
-    const { content, imageUrl, visibility } = req.body;
+    const { content, imageUrl, visibility, category } = req.body;
 
     // Check ownership
     const post = await prisma.post.findUnique({
@@ -210,12 +243,23 @@ router.put('/:postId', async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to edit this post' });
     }
 
+    // Validate category if provided
+    if (category !== undefined && category !== null) {
+      const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ 
+          error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' 
+        });
+      }
+    }
+
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: {
         content: content || post.content,
         imageUrl: imageUrl !== undefined ? imageUrl : post.imageUrl,
         visibility: visibility || post.visibility,
+        category: category !== undefined ? category : post.category,
       },
       include: {
         user: {
@@ -356,12 +400,15 @@ router.post('/:postId/comments', async (req, res) => {
       },
     });
 
+    console.log('Comment created:', comment.id, 'for post:', postId);
+
     // Increment comment count
     await prisma.post.update({
       where: { id: postId },
       data: { commentCount: { increment: 1 } },
     });
 
+    console.log('Returning comment:', JSON.stringify(comment));
     res.status(201).json(comment);
   } catch (error) {
     console.error('Add comment error:', error);

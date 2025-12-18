@@ -8,6 +8,8 @@ const scoresRoutes = require('./routes/scores');
 const friendsRoutes = require('./routes/friends');
 const messagesRoutes = require('./routes/messages');
 const postsRoutes = require('./routes/posts');
+const uploadRoutes = require('./routes/upload');
+const path = require('path');
 
 const app = express();
 
@@ -18,6 +20,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Request logging middleware (development only)
 if (process.env.NODE_ENV === 'development') {
@@ -41,6 +46,7 @@ app.get('/', (req, res) => {
       friends: '/api/friends',
       messages: '/api/messages',
       posts: '/api/posts',
+      upload: '/api/upload',
     },
   });
 });
@@ -59,6 +65,7 @@ app.use('/api/scores', scoresRoutes);
 app.use('/api/friends', authenticateToken, friendsRoutes);
 app.use('/api/messages', authenticateToken, messagesRoutes);
 app.use('/api/posts', authenticateToken, postsRoutes);
+app.use('/api/upload', authenticateToken, uploadRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler
