@@ -21,10 +21,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    // Validate category if provided
-    const validCategories = ['SUDOKU', 'CARO', 'RUBIK', 'PUZZLE', 'CHESS', 'GAME_2048', 'MEMORY', 'QUIZ'];
+    // Validate category if provided (must match GameType enum in schema)
+    const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
     if (category && !validCategories.includes(category)) {
-      return res.status(400).json({ error: 'Invalid category' });
+      return res.status(400).json({ error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' });
     }
 
     const post = await prisma.post.create({
@@ -223,7 +223,7 @@ router.put('/:postId', async (req, res) => {
   try {
     const userId = req.user.id;
     const { postId } = req.params;
-    const { content, imageUrl, visibility } = req.body;
+    const { content, imageUrl, visibility, category } = req.body;
 
     // Check ownership
     const post = await prisma.post.findUnique({
@@ -238,12 +238,23 @@ router.put('/:postId', async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to edit this post' });
     }
 
+    // Validate category if provided
+    if (category !== undefined && category !== null) {
+      const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ 
+          error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' 
+        });
+      }
+    }
+
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: {
         content: content || post.content,
         imageUrl: imageUrl !== undefined ? imageUrl : post.imageUrl,
         visibility: visibility || post.visibility,
+        category: category !== undefined ? category : post.category,
       },
       include: {
         user: {
