@@ -93,6 +93,60 @@ GET /api/auth/me
 Authorization: Bearer <TOKEN>
 ```
 
+#### Forgot Password
+```http
+POST /api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "player1@example.com"
+}
+```
+**Response (Development):**
+```json
+{
+  "success": true,
+  "message": "If email exists, a reset token has been generated",
+  "resetToken": "123456"
+}
+```
+
+#### Reset Password
+```http
+POST /api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "player1@example.com",
+  "resetToken": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
+#### Update Profile
+```http
+PUT /api/auth/profile
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "username": "newusername",
+  "avatarUrl": "https://example.com/avatar.jpg"
+}
+```
+
+#### Change Password
+```http
+POST /api/auth/change-password
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "currentPassword": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
 ---
 
 ### **Game Scores**

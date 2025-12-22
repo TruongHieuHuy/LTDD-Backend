@@ -22,6 +22,10 @@ model User {
   totalGamesPlayed Int @default(0)
   totalScore       Int @default(0)
   
+  // Password reset
+  resetToken       String?   @db.VarChar(255)
+  resetTokenExpiry DateTime?
+  
   // Timestamps
   createdAt   DateTime @default(now())
   lastLoginAt DateTime @default(now())
