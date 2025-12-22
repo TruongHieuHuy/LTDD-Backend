@@ -61,6 +61,17 @@ router.post('/', authenticate, async (req, res) => {
       },
     });
 
+    // Auto-check achievements after saving score
+    // This will unlock any newly achieved badges
+    try {
+      // Import here to avoid circular dependency
+      const checkAchievements = require('./achievements-checker');
+      await checkAchievements(req.userId);
+    } catch (error) {
+      console.error('Achievement check failed (non-critical):', error.message);
+      // Don't fail the score save if achievement check fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Score saved successfully',

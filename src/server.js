@@ -9,6 +9,7 @@ const friendsRoutes = require('./routes/friends');
 const messagesRoutes = require('./routes/messages');
 const postsRoutes = require('./routes/posts');
 const uploadRoutes = require('./routes/upload');
+const achievementsRoutes = require('./routes/achievements');
 const path = require('path');
 
 const app = express();
@@ -47,6 +48,7 @@ app.get('/', (req, res) => {
       messages: '/api/messages',
       posts: '/api/posts',
       upload: '/api/upload',
+      achievements: '/api/achievements',
     },
   });
 });
@@ -66,6 +68,9 @@ app.use('/api/friends', authenticateToken, friendsRoutes);
 app.use('/api/messages', authenticateToken, messagesRoutes);
 app.use('/api/posts', authenticateToken, postsRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
+
+// Achievements routes (some require auth, some are public)
+app.use('/api/achievements', achievementsRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler

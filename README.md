@@ -93,6 +93,60 @@ GET /api/auth/me
 Authorization: Bearer <TOKEN>
 ```
 
+#### Forgot Password
+```http
+POST /api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "player1@example.com"
+}
+```
+**Response (Development):**
+```json
+{
+  "success": true,
+  "message": "If email exists, a reset token has been generated",
+  "resetToken": "123456"
+}
+```
+
+#### Reset Password
+```http
+POST /api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "player1@example.com",
+  "resetToken": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
+#### Update Profile
+```http
+PUT /api/auth/profile
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "username": "newusername",
+  "avatarUrl": "https://example.com/avatar.jpg"
+}
+```
+
+#### Change Password
+```http
+POST /api/auth/change-password
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "currentPassword": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
 ---
 
 ### **Game Scores**
@@ -131,6 +185,51 @@ GET /api/scores/leaderboard?gameType=all&limit=10
 #### Get User Stats
 ```http
 GET /api/scores/stats
+Authorization: Bearer <TOKEN>
+```
+
+---
+
+### **Achievements**
+
+#### Get All Achievements
+```http
+GET /api/achievements?category=games
+```
+
+#### Get User Achievements (with progress)
+```http
+GET /api/achievements/user/:userId
+```
+
+#### Check & Unlock Achievements
+```http
+POST /api/achievements/check
+Authorization: Bearer <TOKEN>
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "newlyUnlocked": [
+      {
+        "id": "uuid",
+        "name": "First Steps",
+        "description": "Play your first game",
+        "icon": "👶",
+        "points": 10
+      }
+    ],
+    "totalChecked": 24,
+    "totalUpdated": 3
+  }
+}
+```
+
+#### Get Achievement Stats
+```http
+GET /api/achievements/stats
 Authorization: Bearer <TOKEN>
 ```
 
