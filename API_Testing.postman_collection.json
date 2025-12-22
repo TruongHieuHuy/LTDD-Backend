@@ -572,6 +572,69 @@
           }
         }
       ]
+    },
+    {
+      "name": "6. Achievements",
+      "item": [
+        {
+          "name": "Get All Achievements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/achievements",
+              "host": ["{{base_url}}"],
+              "path": ["api", "achievements"]
+            }
+          }
+        },
+        {
+          "name": "Get User Achievements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/achievements/user/USER_ID_HERE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "achievements", "user", "USER_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Check & Unlock Achievements",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/achievements/check",
+              "host": ["{{base_url}}"],
+              "path": ["api", "achievements", "check"]
+            }
+          }
+        },
+        {
+          "name": "Get Achievement Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/achievements/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "achievements", "stats"]
+            }
+          }
+        }
+      ]
     }
   ]
 }

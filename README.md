@@ -190,6 +190,51 @@ Authorization: Bearer <TOKEN>
 
 ---
 
+### **Achievements**
+
+#### Get All Achievements
+```http
+GET /api/achievements?category=games
+```
+
+#### Get User Achievements (with progress)
+```http
+GET /api/achievements/user/:userId
+```
+
+#### Check & Unlock Achievements
+```http
+POST /api/achievements/check
+Authorization: Bearer <TOKEN>
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "newlyUnlocked": [
+      {
+        "id": "uuid",
+        "name": "First Steps",
+        "description": "Play your first game",
+        "icon": "👶",
+        "points": 10
+      }
+    ],
+    "totalChecked": 24,
+    "totalUpdated": 3
+  }
+}
+```
+
+#### Get Achievement Stats
+```http
+GET /api/achievements/stats
+Authorization: Bearer <TOKEN>
+```
+
+---
+
 ## 🗄️ DATABASE SCHEMA
 
 ### Users Table
