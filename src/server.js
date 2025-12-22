@@ -94,10 +94,19 @@ app.use((err, req, res, next) => {
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
   console.log('='.repeat(50));
   console.log('🚀 Server running on port', PORT);
   console.log('📝 Environment:', process.env.NODE_ENV || 'development');
   console.log('🌐 Base URL: http://localhost:' + PORT);
   console.log('='.repeat(50));
 });
+
+// ==================== SOCKET.IO SETUP ====================
+const { initializeSocket } = require('./config/socket');
+const io = initializeSocket(httpServer);
+
+// Make io accessible to routes
+app.set('io', io);
+
+console.log('💬 Real-time chat enabled');
