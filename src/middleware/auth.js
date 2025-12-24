@@ -29,6 +29,7 @@ const authenticate = async (req, res, next) => {
         id: true,
         username: true,
         email: true,
+        role: true, // Include role
         avatarUrl: true,
         totalGamesPlayed: true,
         totalScore: true,
@@ -70,4 +71,33 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken: authenticate };
+/**
+ * Role-based authorization middleware
+ * @param {string[]} allowedRoles - Array of allowed roles (e.g., ['ADMIN', 'MODERATOR'])
+ * @returns Middleware function
+ * 
+ * Usage: router.get('/admin', authenticate, requireRole(['ADMIN']), handler)
+ */
+const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    // Check if user exists (should be set by authenticate middleware)
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized - No user found',
+      });
+    }
+
+    // Check if user has required role
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden - Requires one of roles: ${allowedRoles.join(', ')}`,
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = { authenticateToken: authenticate, requireRole };
