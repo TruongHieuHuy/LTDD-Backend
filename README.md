@@ -235,7 +235,94 @@ Authorization: Bearer <TOKEN>
 
 ---
 
-## 🗄️ DATABASE SCHEMA
+## � SOCKET.IO REAL-TIME CHAT
+
+### Connection
+```javascript
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:3000', {
+  auth: {
+    token: 'YOUR_JWT_TOKEN'
+  }
+});
+
+socket.on('connect', () => {
+  console.log('Connected to server');
+});
+```
+
+### Events
+
+#### Join Chat Room
+```javascript
+socket.emit('chat:join', {
+  otherUserId: 'user-id-here'
+});
+
+socket.on('chat:joined', (data) => {
+  console.log('Joined room:', data.roomId);
+});
+```
+
+#### Send Message
+```javascript
+socket.emit('message:send', {
+  receiverId: 'user-id-here',
+  content: 'Hello!',
+  type: 'text'
+});
+
+socket.on('message:new', (message) => {
+  console.log('New message:', message);
+});
+```
+
+#### Typing Indicator
+```javascript
+socket.emit('typing:start', { receiverId: 'user-id-here' });
+socket.emit('typing:stop', { receiverId: 'user-id-here' });
+
+socket.on('typing:user', (data) => {
+  console.log(`${data.username} is typing: ${data.isTyping}`);
+});
+```
+
+#### Mark Message as Read
+```javascript
+socket.emit('message:read', {
+  messageId: 'message-id',
+  senderId: 'sender-id'
+});
+
+socket.on('message:read', (data) => {
+  console.log('Message read:', data);
+});
+```
+
+#### Online Status
+```javascript
+socket.emit('friends:online');
+
+socket.on('friends:online', (data) => {
+  console.log('Online friends:', data.onlineFriends);
+});
+
+socket.on('user:status', (data) => {
+  console.log(`${data.userId} is ${data.status}`);
+});
+```
+
+#### Message Notifications
+```javascript
+socket.on('message:notification', (data) => {
+  console.log(`New message from ${data.senderName}: ${data.content}`);
+});
+```
+
+---
+
+## �🗄️ DATABASE SCHEMA
 
 ### Users Table
 - `id` (UUID)
