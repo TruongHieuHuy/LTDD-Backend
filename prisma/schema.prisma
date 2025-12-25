@@ -17,6 +17,7 @@ model User {
   email     String   @unique @db.VarChar(100)
   password  String   @db.VarChar(255)
   avatarUrl String?  @db.VarChar(500)
+  role      UserRole @default(USER) // Role-based access control
   
   // Statistics
   totalGamesPlayed Int @default(0)
@@ -152,6 +153,12 @@ model Message {
 }
 
 // ==================== ENUMS ====================
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
 enum GameType {
   rubik
   sudoku

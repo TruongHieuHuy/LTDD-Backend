@@ -72,17 +72,22 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user
+    // Create user (check if first user to make ADMIN)
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
+    
     const user = await prisma.user.create({
       data: {
         username,
         email: email.toLowerCase(),
         password: hashedPassword,
+        role: isFirstUser ? 'ADMIN' : 'USER', // First user is ADMIN
       },
       select: {
         id: true,
         username: true,
         email: true,
+        role: true,
         createdAt: true,
       },
     });
@@ -162,6 +167,7 @@ router.post('/login', async (req, res) => {
           id: user.id,
           username: user.username,
           email: user.email,
+          role: user.role, // Thêm role
           avatarUrl: user.avatarUrl,
           totalGamesPlayed: user.totalGamesPlayed,
           totalScore: user.totalScore,
