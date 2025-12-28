@@ -4,6 +4,7 @@ const cors = require('cors');
 const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 const logger = require('./config/logger');
+const { generalLimiter, authLimiter, scoreLimiter, postLimiter } = require('./middleware/rate-limiter');
 const authRoutes = require('./routes/auth');
 const scoresRoutes = require('./routes/scores');
 const friendsRoutes = require('./routes/friends');
@@ -35,6 +36,9 @@ app.use((req, res, next) => {
 // ==================== DATABASE CONNECTION ====================
 connectDB();
 
+// ==================== RATE LIMITING ====================
+app.use('/api/', generalLimiter);
+
 // ==================== ROUTES ====================
 app.get('/', (req, res) => {
   res.json({
@@ -59,13 +63,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/scores', scoresRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/scores', authenticateToken, scoreLimiter, scoresRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/friends', authenticateToken, friendsRoutes);
 app.use('/api/messages', authenticateToken, messagesRoutes);
-app.use('/api/posts', authenticateToken, postsRoutes);
+app.use('/api/posts', authenticateToken, postLimiter, postsRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 
 // Achievements routes (some require auth, some are public)

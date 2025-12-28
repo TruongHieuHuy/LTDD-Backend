@@ -21,11 +21,42 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Validate gameType enum
-    const validGameTypes = ['rubik', 'sudoku', 'caro', 'puzzle'];
+    const validGameTypes = [
+      'guess_number', 'cows_bulls', 'memory_match', 'quick_math',
+      'rubik', 'sudoku', 'caro', 'puzzle'
+    ];
     if (!validGameTypes.includes(gameType)) {
       return res.status(400).json({
         success: false,
         message: `Invalid gameType. Must be one of: ${validGameTypes.join(', ')}`,
+      });
+    }
+
+    // Validate score range (general)
+    if (score < 0 || score > 1000000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Score must be between 0 and 1,000,000',
+      });
+    }
+
+    // Game-specific maximum scores
+    const maxScores = {
+      guess_number: 10000,
+      cows_bulls: 50000,
+      quick_math: 99999,
+      memory_match: 5000,
+      rubik: 100000,
+      sudoku: 100000,
+      caro: 50000,
+      puzzle: 50000,
+    };
+
+    const maxScore = maxScores[gameType] || 1000000;
+    if (score > maxScore) {
+      return res.status(400).json({
+        success: false,
+        message: `Score exceeds maximum (${maxScore}) for ${gameType}`,
       });
     }
 
