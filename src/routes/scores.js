@@ -38,27 +38,32 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
-    // Create game score
-    const gameScore = await prisma.gameScore.create({
-      data: {
-        userId: req.userId,
-        gameType,
-        score: parseInt(score),
-        attempts: attempts ? parseInt(attempts) : 1,
-        difficulty,
-        timeSpent: timeSpent ? parseInt(timeSpent) : 0,
-        gameData: gameData || null,
-        syncedAt: new Date(),
-      },
-    });
+    // Use a transaction to ensure data integrity
+    const gameScore = await prisma.$transaction(async (tx) => {
+      // Create game score
+      const newGameScore = await tx.gameScore.create({
+        data: {
+          userId: req.userId,
+          gameType,
+          score: parseInt(score),
+          attempts: attempts ? parseInt(attempts) : 1,
+          difficulty,
+          timeSpent: timeSpent ? parseInt(timeSpent) : 0,
+          gameData: gameData || null,
+          syncedAt: new Date(),
+        },
+      });
 
-    // Update user statistics
-    await prisma.user.update({
-      where: { id: req.userId },
-      data: {
-        totalGamesPlayed: { increment: 1 },
-        totalScore: { increment: parseInt(score) },
-      },
+      // Update user statistics
+      await tx.user.update({
+        where: { id: req.userId },
+        data: {
+          totalGamesPlayed: { increment: 1 },
+          totalScore: { increment: parseInt(score) },
+        },
+      });
+
+      return newGameScore;
     });
 
     // Auto-check achievements after saving score

@@ -4,21 +4,17 @@
  */
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
-// Store online users: Map<userId, socketId>
-const onlineUsers = new Map();
-
-// Store user rooms: Map<userId, Set<roomId>>
-const userRooms = new Map();
+const { createClient } = require('redis');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { prisma } = require('./database'); // Use the shared Prisma instance
+const logger = require('./logger');
 
 /**
  * Initialize Socket.IO server
  * @param {http.Server} httpServer - HTTP server instance
  * @returns {Server} Socket.IO server instance
  */
-function initializeSocket(httpServer) {
+async function initializeSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
       origin: process.env.CORS_ORIGIN || '*',
@@ -27,6 +23,21 @@ function initializeSocket(httpServer) {
     },
     transports: ['websocket', 'polling'],
   });
+
+  // Create Redis clients for pub/sub
+  try {
+    const pubClient = createClient({ url: process.env.REDIS_URL });
+    const subClient = pubClient.duplicate();
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+
+    // Use Redis adapter
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('✅ Redis Adapter connected successfully');
+  } catch (err) {
+    logger.warn('⚠️ Redis connection failed - Falling back to in-memory adapter');
+    logger.warn(`Redis Error: ${err.message}`);
+  }
 
   // Authentication middleware
   io.use(async (socket, next) => {
@@ -59,7 +70,7 @@ function initializeSocket(httpServer) {
       socket.user = user;
       next();
     } catch (error) {
-      console.error('Socket authentication error:', error);
+      logger.error({ err: error, socketId: socket.id }, 'Socket authentication error');
       next(new Error('Invalid authentication token'));
     }
   });
@@ -67,15 +78,10 @@ function initializeSocket(httpServer) {
   // Connection handler
   io.on('connection', (socket) => {
     const userId = socket.userId;
-    console.log(`✅ User connected: ${socket.user.username} (${userId})`);
+    logger.info({ user: socket.user.username, id: userId, socketId: socket.id }, '✅ User connected');
 
-    // Add user to online users
-    onlineUsers.set(userId, socket.id);
-
-    // Initialize user rooms
-    if (!userRooms.has(userId)) {
-      userRooms.set(userId, new Set());
-    }
+    // Join a room identified by the user's ID for presence tracking
+    socket.join(userId);
 
     // Broadcast user online status to their friends
     broadcastUserStatus(io, userId, 'online');
@@ -84,11 +90,8 @@ function initializeSocket(httpServer) {
     socket.on('chat:join', async (data) => {
       try {
         const { otherUserId } = data;
-
-        // Create room ID (normalized: smaller ID first)
         const roomId = [userId, otherUserId].sort().join('-');
 
-        // Check if they are friends
         const friendship = await prisma.friendship.findFirst({
           where: {
             OR: [
@@ -104,15 +107,11 @@ function initializeSocket(httpServer) {
           return;
         }
 
-        // Join the room
         socket.join(roomId);
-        userRooms.get(userId).add(roomId);
-
-        console.log(`💬 ${socket.user.username} joined room: ${roomId}`);
-
+        logger.info({ user: socket.user.username, room: roomId }, '💬 User joined room');
         socket.emit('chat:joined', { roomId, otherUserId });
       } catch (error) {
-        console.error('Join room error:', error);
+        logger.error({ err: error, user: socket.user.username }, 'Join room error');
         socket.emit('error', { message: 'Failed to join chat room' });
       }
     });
@@ -121,11 +120,8 @@ function initializeSocket(httpServer) {
     socket.on('chat:leave', (data) => {
       const { otherUserId } = data;
       const roomId = [userId, otherUserId].sort().join('-');
-
       socket.leave(roomId);
-      userRooms.get(userId)?.delete(roomId);
-
-      console.log(`👋 ${socket.user.username} left room: ${roomId}`);
+      logger.info({ user: socket.user.username, room: roomId }, '👋 User left room');
     });
 
     // ==================== SEND MESSAGE ====================
@@ -134,55 +130,31 @@ function initializeSocket(httpServer) {
         const { receiverId, content, type = 'text' } = data;
 
         if (!content || !receiverId) {
-          socket.emit('error', { message: 'Content and receiverId required' });
-          return;
+          return socket.emit('error', { message: 'Content and receiverId required' });
         }
 
-        // Check if they are friends
         const friendship = await prisma.friendship.findFirst({
-          where: {
-            OR: [
-              { userId1: userId, userId2: receiverId },
-              { userId1: receiverId, userId2: userId },
-            ],
-            isBlocked: false,
-          },
+          where: { OR: [{ userId1: userId, userId2: receiverId }, { userId1: receiverId, userId2: userId }], isBlocked: false },
         });
 
         if (!friendship) {
-          socket.emit('error', { message: 'Can only message friends' });
-          return;
+          return socket.emit('error', { message: 'Can only message friends' });
         }
 
-        // Save message to database
         const message = await prisma.message.create({
-          data: {
-            senderId: userId,
-            receiverId,
-            content,
-            type,
-          },
-          include: {
-            sender: {
-              select: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              },
-            },
-          },
+          data: { senderId: userId, receiverId, content, type },
+          include: { sender: { select: { id: true, username: true, avatarUrl: true } } },
         });
 
-        // Emit to room
         const roomId = [userId, receiverId].sort().join('-');
         io.to(roomId).emit('message:new', message);
 
-        // If receiver is online but not in room, send notification
-        const receiverSocketId = onlineUsers.get(receiverId);
-        if (receiverSocketId) {
-          const receiverRooms = userRooms.get(receiverId) || new Set();
-          if (!receiverRooms.has(roomId)) {
-            io.to(receiverSocketId).emit('message:notification', {
+        // If receiver is online but not in the chat room, send a notification
+        const receiverSockets = await io.in(receiverId).fetchSockets();
+        if (receiverSockets.length > 0) {
+          const isReceiverInChat = receiverSockets.some(sock => sock.rooms.has(roomId));
+          if (!isReceiverInChat) {
+            io.to(receiverId).emit('message:notification', {
               senderId: userId,
               senderName: socket.user.username,
               content: content.substring(0, 50),
@@ -190,10 +162,10 @@ function initializeSocket(httpServer) {
             });
           }
         }
-
-        console.log(`📨 Message from ${socket.user.username} to ${receiverId}`);
+        
+        logger.info({ from: socket.user.username, to: receiverId }, '📨 Message sent');
       } catch (error) {
-        console.error('Send message error:', error);
+        logger.error({ err: error, user: socket.user.username }, 'Send message error');
         socket.emit('error', { message: 'Failed to send message' });
       }
     });
@@ -202,101 +174,60 @@ function initializeSocket(httpServer) {
     socket.on('typing:start', (data) => {
       const { receiverId } = data;
       const roomId = [userId, receiverId].sort().join('-');
-
-      socket.to(roomId).emit('typing:user', {
-        userId,
-        username: socket.user.username,
-        isTyping: true,
-      });
+      socket.to(roomId).emit('typing:user', { userId, username: socket.user.username, isTyping: true });
     });
 
     socket.on('typing:stop', (data) => {
       const { receiverId } = data;
       const roomId = [userId, receiverId].sort().join('-');
-
-      socket.to(roomId).emit('typing:user', {
-        userId,
-        username: socket.user.username,
-        isTyping: false,
-      });
+      socket.to(roomId).emit('typing:user', { userId, username: socket.user.username, isTyping: false });
     });
 
     // ==================== MESSAGE READ ====================
     socket.on('message:read', async (data) => {
       try {
         const { messageId, senderId } = data;
-
-        // Update message as read
-        await prisma.message.update({
-          where: { id: messageId },
-          data: {
-            isRead: true,
-            readAt: new Date(),
-          },
-        });
-
-        // Notify sender
-        const senderSocketId = onlineUsers.get(senderId);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('message:read', {
-            messageId,
-            readBy: userId,
-            readAt: new Date(),
-          });
-        }
+        await prisma.message.update({ where: { id: messageId }, data: { isRead: true, readAt: new Date() } });
+        io.to(senderId).emit('message:read', { messageId, readBy: userId, readAt: new Date() });
       } catch (error) {
-        console.error('Mark read error:', error);
+        logger.error({ err: error, user: userId, messageId: data.messageId }, 'Mark read error');
       }
     });
 
     // ==================== GET ONLINE FRIENDS ====================
     socket.on('friends:online', async () => {
       try {
-        // Get user's friends
         const friendships = await prisma.friendship.findMany({
-          where: {
-            OR: [
-              { userId1: userId },
-              { userId2: userId },
-            ],
-            isBlocked: false,
-          },
+          where: { OR: [{ userId1: userId }, { userId2: userId }], isBlocked: false },
         });
 
-        const friendIds = friendships.map(f => 
-          f.userId1 === userId ? f.userId2 : f.userId1
-        );
-
-        // Check which friends are online
-        const onlineFriends = friendIds.filter(id => onlineUsers.has(id));
-
+        const friendIds = friendships.map(f => f.userId1 === userId ? f.userId2 : f.userId1);
+        const onlineFriends = [];
+        for (const friendId of friendIds) {
+          const sockets = await io.in(friendId).fetchSockets();
+          if (sockets.length > 0) {
+            onlineFriends.push(friendId);
+          }
+        }
         socket.emit('friends:online', { onlineFriends });
       } catch (error) {
-        console.error('Get online friends error:', error);
+        logger.error({ err: error, user: userId }, 'Get online friends error');
       }
     });
 
     // ==================== DISCONNECT ====================
     socket.on('disconnect', () => {
-      console.log(`❌ User disconnected: ${socket.user.username} (${userId})`);
-
-      // Remove from online users
-      onlineUsers.delete(userId);
-
-      // Clear rooms
-      userRooms.delete(userId);
-
-      // Broadcast user offline status
+      logger.info({ user: socket.user.username, id: userId, socketId: socket.id }, '❌ User disconnected');
       broadcastUserStatus(io, userId, 'offline');
     });
 
     // ==================== ERROR HANDLER ====================
     socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      logger.error({ err: error, socketId: socket.id }, 'Socket error event');
     });
   });
 
-  console.log('🔌 Socket.IO server initialized');
+  logger.info('🔌 Socket.IO server initialized with Redis Adapter');
   return io;
 }
 
@@ -309,50 +240,36 @@ function initializeSocket(httpServer) {
 async function broadcastUserStatus(io, userId, status) {
   try {
     const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userId1: userId },
-          { userId2: userId },
-        ],
-        isBlocked: false,
-      },
+      where: { OR: [{ userId1: userId }, { userId2: userId }], isBlocked: false },
     });
+    const friendIds = friendships.map(f => f.userId1 === userId ? f.userId2 : f.userId1);
 
-    const friendIds = friendships.map(f => 
-      f.userId1 === userId ? f.userId2 : f.userId1
-    );
-
-    // Notify online friends
+    // Notify online friends by emitting to their dedicated room
     friendIds.forEach(friendId => {
-      const friendSocketId = onlineUsers.get(friendId);
-      if (friendSocketId) {
-        io.to(friendSocketId).emit('user:status', {
-          userId,
-          status,
-          timestamp: new Date(),
-        });
-      }
+      io.to(friendId).emit('user:status', { userId, status, timestamp: new Date() });
     });
   } catch (error) {
-    console.error('Broadcast status error:', error);
+    logger.error({ err: error, userId }, 'Broadcast status error');
   }
 }
 
 /**
- * Get online users count
- * @returns {number} Number of online users
+ * Get online users count (approximated)
+ * @returns {Promise<number>} Number of online users
  */
-function getOnlineUsersCount() {
-  return onlineUsers.size;
+async function getOnlineUsersCount(io) {
+  const sockets = await io.fetchSockets();
+  return sockets.length;
 }
 
 /**
  * Check if user is online
  * @param {string} userId - User ID to check
- * @returns {boolean} True if user is online
+ * @returns {Promise<boolean>} True if user is online
  */
-function isUserOnline(userId) {
-  return onlineUsers.has(userId);
+async function isUserOnline(io, userId) {
+  const sockets = await io.in(userId).fetchSockets();
+  return sockets.length > 0;
 }
 
 module.exports = {
