@@ -15,6 +15,7 @@ const postsRoutes = require('./routes/posts');
 const uploadRoutes = require('./routes/upload');
 const achievementsRoutes = require('./routes/achievements');
 const usersRoutes = require('./routes/users');
+const challengesRoutes = require('./routes/challenges');
 const path = require('path');
 
 const app = express();
@@ -41,6 +42,10 @@ app.use((req, res, next) => {
 
 // ==================== DATABASE CONNECTION ====================
 connectDB();
+
+// Start challenge cleanup cron job
+const { startChallengeCleanupCron } = require('./utils/challenge-cleanup-cron');
+startChallengeCleanupCron();
 
 // ==================== RATE LIMITING ====================
 app.use('/api/', generalLimiter);
@@ -83,6 +88,9 @@ app.use('/api/achievements', achievementsRoutes);
 
 // Users routes (profile management)
 app.use('/api/users', usersRoutes);
+
+// Challenge routes (PK system)
+app.use('/api/challenges', authenticateToken, challengesRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler
