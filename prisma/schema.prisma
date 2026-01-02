@@ -22,6 +22,7 @@ model User {
   // Statistics
   totalGamesPlayed Int @default(0)
   totalScore       Int @default(0)
+  coins            Int @default(1000) // Virtual currency for betting
   
   // Password reset
   resetToken       String?   @db.VarChar(255)
@@ -54,6 +55,11 @@ model User {
   
   // Achievement relations
   userAchievements UserAchievement[]
+  
+  // Challenge relations
+  challengesCreated  Challenge[] @relation("ChallengeCreator")
+  challengesReceived Challenge[] @relation("ChallengeOpponent")
+  challengesWon      Challenge[] @relation("ChallengeWinner")
   
   @@map("users")
 }
@@ -155,8 +161,17 @@ model Message {
 // ==================== ENUMS ====================
 enum UserRole {
   USER
-  ADMIN
   MODERATOR
+  ADMIN
+}
+
+// ==================== CHALLENGE STATUS ====================
+enum ChallengeStatus {
+  PENDING   // Waiting for opponent to accept
+  ACTIVE    // Accepted and in progress (voting or playing)
+  COMPLETED // Finished with winner/draw
+  EXPIRED   // Timed out (not accepted within expiresAt)
+  CANCELLED // Creator cancelled or opponent rejected
 }
 
 enum GameType {
@@ -352,6 +367,79 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId, isUnlocked])
   @@map("user_achievements")
+}
+
+// ==================== CHALLENGE (PK) MODEL ====================
+model Challenge {
+  id          String   @id @default(uuid())
+  creatorId   String
+  opponentId  String?  // Null until someone accepts
+  
+  // Betting
+  betAmount   Int      @default(100) // Coins wagered
+  
+  // Game tracking (Best of 3)
+  totalGames     Int @default(3)
+  currentGame    Int @default(1)
+  gamesCompleted Int @default(0)
+  
+  // Game votes and types for each round
+  game1Type          String?
+  game1CreatorVote   String?
+  game1OpponentVote  String?
+  
+  game2Type          String?
+  game2CreatorVote   String?
+  game2OpponentVote  String?
+  
+  game3Type          String?
+  game3CreatorVote   String?
+  game3OpponentVote  String?
+  
+  // Scores for each game
+  game1CreatorScore  Int @default(0)
+  game1OpponentScore Int @default(0)
+  game1Completed     Boolean @default(false)
+  
+  game2CreatorScore  Int @default(0)
+  game2OpponentScore Int @default(0)
+  game2Completed     Boolean @default(false)
+  
+  game3CreatorScore  Int @default(0)
+  game3OpponentScore Int @default(0)
+  game3Completed     Boolean @default(false)
+  
+  // Overall scores (wins count)
+  creatorWins   Int @default(0)
+  opponentWins  Int @default(0)
+  
+  // Winner
+  winnerId       String?
+  isDraw         Boolean @default(false)
+  
+  // State and timestamps
+  status      ChallengeStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  acceptedAt  DateTime?
+  expiresAt   DateTime // Auto-cancel if not accepted by this time
+  completedAt DateTime?
+  cancelledAt DateTime?
+  
+  // Metadata
+  creatorForfeit   Boolean @default(false)
+  opponentForfeit  Boolean @default(false)
+  
+  // Relations
+  creator  User  @relation("ChallengeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  opponent User? @relation("ChallengeOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  winner   User? @relation("ChallengeWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  
+  // Indexes for performance
+  @@index([creatorId, status])
+  @@index([opponentId, status])
+  @@index([status, expiresAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("challenges")
 }
 
 // ==================== ENUMS ====================
