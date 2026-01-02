@@ -18,6 +18,35 @@ const generateToken = (userId) => {
 };
 
 /**
+ * Validate password strength
+ */
+const validatePassword = (password) => {
+  const errors = [];
+
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
+  }
+
+  return errors;
+};
+
+/**
  * POST /api/auth/register
  * Register new user
  */
@@ -41,11 +70,13 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Validate password length
-    if (password.length < 6) {
+    // Validate password strength
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters',
+        message: 'Password validation failed',
+        errors: passwordErrors,
       });
     }
 
@@ -62,8 +93,8 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: existingUser.email === email.toLowerCase() 
-          ? 'Email already exists' 
+        message: existingUser.email === email.toLowerCase()
+          ? 'Email already exists'
           : 'Username already exists',
       });
     }
@@ -75,7 +106,7 @@ router.post('/register', async (req, res) => {
     // Create user (check if first user to make ADMIN)
     const userCount = await prisma.user.count();
     const isFirstUser = userCount === 0;
-    
+
     const user = await prisma.user.create({
       data: {
         username,

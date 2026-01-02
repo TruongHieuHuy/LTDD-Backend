@@ -160,6 +160,13 @@ enum UserRole {
 }
 
 enum GameType {
+  // Current implemented games
+  guess_number
+  cows_bulls
+  memory_match
+  quick_math
+  
+  // Future games
   rubik
   sudoku
   caro
