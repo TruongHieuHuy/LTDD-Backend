@@ -5,6 +5,8 @@ const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 const logger = require('./config/logger');
 const { generalLimiter, authLimiter, scoreLimiter, postLimiter } = require('./middleware/rate-limiter');
+const { errorHandler } = require('./middleware/error-handler');
+const { sanitizeInput } = require('./middleware/sanitize');
 const authRoutes = require('./routes/auth');
 const scoresRoutes = require('./routes/scores');
 const friendsRoutes = require('./routes/friends');
@@ -12,6 +14,7 @@ const messagesRoutes = require('./routes/messages');
 const postsRoutes = require('./routes/posts');
 const uploadRoutes = require('./routes/upload');
 const achievementsRoutes = require('./routes/achievements');
+const usersRoutes = require('./routes/users');
 const path = require('path');
 
 const app = express();
@@ -23,6 +26,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Input sanitization (apply globally)
+app.use(sanitizeInput);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -75,6 +81,9 @@ app.use('/api/upload', authenticateToken, uploadRoutes);
 // Achievements routes (some require auth, some are public)
 app.use('/api/achievements', achievementsRoutes);
 
+// Users routes (profile management)
+app.use('/api/users', usersRoutes);
+
 // ==================== ERROR HANDLING ====================
 // 404 handler
 app.use((req, res) => {
@@ -85,14 +94,7 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
-  logger.error({ err, req: { method: req.method, url: req.path } }, 'Unhandled error');
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { error: err.message }),
-  });
-});
+app.use(errorHandler);
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3000;

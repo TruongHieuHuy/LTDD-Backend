@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const { PrismaClient} = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // ==================== CREATE POST ====================
@@ -21,10 +21,19 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    // Validate category if provided (must match GameType enum in schema)
-    const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
+    // Validate category if provided
+    const validCategories = [
+      'guess_number',
+      'cows_bulls',
+      'memory_match',
+      'quick_math',
+      'rubik',
+      'sudoku',
+      'puzzle',
+      'caro'
+    ];
     if (category && !validCategories.includes(category)) {
-      return res.status(400).json({ error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' });
+      return res.status(400).json({ error: 'Invalid category' });
     }
 
     const post = await prisma.post.create({
@@ -245,10 +254,19 @@ router.put('/:postId', async (req, res) => {
 
     // Validate category if provided
     if (category !== undefined && category !== null) {
-      const validCategories = ['rubik', 'sudoku', 'puzzle', 'caro'];
+      const validCategories = [
+        'guess_number',
+        'cows_bulls',
+        'memory_match',
+        'quick_math',
+        'rubik',
+        'sudoku',
+        'puzzle',
+        'caro'
+      ];
       if (!validCategories.includes(category)) {
-        return res.status(400).json({ 
-          error: 'Invalid category. Must be one of: rubik, sudoku, puzzle, caro' 
+        return res.status(400).json({
+          error: 'Invalid category'
         });
       }
     }
@@ -546,6 +564,41 @@ router.post('/follow/:targetUserId', async (req, res) => {
   } catch (error) {
     console.error('Follow user error:', error);
     res.status(500).json({ error: 'Failed to follow user' });
+  }
+});
+
+// ==================== SHARE POST ====================
+/**
+ * POST /api/posts/:postId/share
+ * Increment share count on a post
+ */
+router.post('/:postId/share', async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    // Check if post exists
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Increment share count
+    const updatedPost = await prisma.post.update({
+      where: { id: postId },
+      data: { shareCount: { increment: 1 } },
+    });
+
+    res.json({
+      success: true,
+      message: 'Post shared successfully',
+      shareCount: updatedPost.shareCount
+    });
+  } catch (error) {
+    console.error('Share post error:', error);
+    res.status(500).json({ error: 'Failed to share post' });
   }
 });
 

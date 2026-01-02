@@ -44,11 +44,11 @@ const scoreLimiter = rateLimit({
 });
 
 /**
- * Post creation limiter - 20 posts per hour
+ * Post creation limiter - 100 posts per hour (relaxed for testing)
  */
 const postLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20,
+    max: 100, // Increased from 20 to 100
     message: {
         success: false,
         message: 'Too many posts created, please try again later.'

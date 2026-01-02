@@ -178,16 +178,62 @@ router.get('/', authenticate, async (req, res) => {
 
 /**
  * GET /api/scores/leaderboard
- * Get global leaderboard
+ * Get global leaderboard with enhanced filters
+ * Query params:
+ *  - gameType: 'all' | 'GUESS_NUMBER' | 'COWS_BULLS' | 'MEMORY_MATCH' | 'QUICK_MATH'
+ *  - period: 'all-time' | 'daily' | 'weekly' | 'monthly'
+ *  - difficulty: 'EASY' | 'MEDIUM' | 'HARD' (optional)
+ *  - limit: number (default 100)
  */
 router.get('/leaderboard', async (req, res) => {
   try {
-    const { gameType, difficulty, limit = 10 } = req.query;
+    const {
+      gameType = 'all',
+      difficulty,
+      period = 'all-time',
+      limit = 100
+    } = req.query;
 
     // Build query filters
     const where = {};
-    if (gameType && gameType !== 'all') where.gameType = gameType;
-    if (difficulty && difficulty !== 'all') where.difficulty = difficulty;
+
+    // Filter by game type
+    if (gameType && gameType !== 'all') {
+      where.gameType = gameType.toUpperCase();
+    }
+
+    // Filter by difficulty
+    if (difficulty && difficulty !== 'all') {
+      where.difficulty = difficulty.toUpperCase();
+    }
+
+    // Filter by time period
+    if (period !== 'all-time') {
+      const now = new Date();
+      let startDate;
+
+      switch (period) {
+        case 'daily':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          break;
+        case 'weekly':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          startDate = weekAgo;
+          break;
+        case 'monthly':
+          const monthAgo = new Date(now);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          startDate = monthAgo;
+          break;
+        default:
+          break; // all-time - no filter
+      }
+
+      if (startDate) {
+        where.createdAt = { gte: startDate };
+      }
+    }
 
     // Fetch top scores
     const leaderboard = await prisma.gameScore.findMany({
@@ -200,15 +246,53 @@ router.get('/leaderboard', async (req, res) => {
             id: true,
             username: true,
             avatarUrl: true,
+            totalScore: true,
+            totalGamesPlayed: true
           },
         },
       },
     });
 
+    // Add ranks
+    const rankedLeaderboard = leaderboard.map((entry, index) => ({
+      rank: index + 1,
+      ...entry
+    }));
+
+    // Calculate personal rank if user is authenticated
+    let personalRank = null;
+    if (req.userId) {
+      // Get user's best score with same filters
+      const userBestScore = await prisma.gameScore.findFirst({
+        where: {
+          ...where,
+          userId: req.userId
+        },
+        orderBy: { score: 'desc' }
+      });
+
+      if (userBestScore) {
+        // Count how many scores are better
+        const betterCount = await prisma.gameScore.count({
+          where: {
+            ...where,
+            score: { gt: userBestScore.score }
+          }
+        });
+        personalRank = betterCount + 1;
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        leaderboard,
+        leaderboard: rankedLeaderboard,
+        personalRank,
+        filters: {
+          gameType,
+          period,
+          difficulty: difficulty || null
+        }
       },
     });
   } catch (error) {
