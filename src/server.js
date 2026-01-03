@@ -17,6 +17,8 @@ const achievementsRoutes = require('./routes/achievements');
 const usersRoutes = require('./routes/users');
 const path = require('path');
 
+const sudokuRoutes = require('./routes/sudoku'); 
+
 const app = express();
 
 // ==================== MIDDLEWARE ====================
@@ -84,6 +86,14 @@ app.use('/api/achievements', achievementsRoutes);
 // Users routes (profile management)
 app.use('/api/users', usersRoutes);
 
+//
+app.use('/api/auth', authRoutes);
+app.use('/api/scores', scoresRoutes);
+
+
+app.use('/api/sudoku', sudokuRoutes);
+
+
 // ==================== ERROR HANDLING ====================
 // 404 handler
 app.use((req, res) => {
@@ -129,5 +139,8 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+
+
 
 startServer();
