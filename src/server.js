@@ -17,8 +17,8 @@ const achievementsRoutes = require('./routes/achievements');
 const usersRoutes = require('./routes/users');
 const challengesRoutes = require('./routes/challenges');
 const path = require('path');
+const puzzleRoutes = require('./routes/puzzle');
 
-const sudokuRoutes = require('./routes/sudoku'); 
 
 const app = express();
 
@@ -91,15 +91,11 @@ app.use('/api/achievements', achievementsRoutes);
 // Users routes (profile management)
 app.use('/api/users', usersRoutes);
 
-//
-app.use('/api/auth', authRoutes);
-app.use('/api/scores', scoresRoutes);
-
-
-app.use('/api/sudoku', sudokuRoutes);
-
 // Challenge routes (PK system)
 app.use('/api/challenges', authenticateToken, challengesRoutes);
+
+
+app.use('/api/puzzle', puzzleRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler
@@ -146,8 +142,5 @@ async function startServer() {
     process.exit(1);
   }
 }
-
-
-
 
 startServer();
