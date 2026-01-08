@@ -18,10 +18,85 @@ const generateToken = (userId) => {
 };
 
 /**
- * POST /api/auth/register
- * Register new user
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: The auto-generated id of the user
+ *         username:
+ *           type: string
+ *         email:
+ *           type: string
+ *         role:
+ *           type: string
+ *           enum: [USER, ADMIN, MODERATOR]
+ *       example:
+ *         id: d5fE_asz
+ *         username: johndoe
+ *         email: john@test.com
+ *         role: USER
+ */
+
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: User authentication
+ */
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 20
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *     responses:
+ *       201:
+ *         description: The user was successfully created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     token:
+ *                       type: string
+ *       400:
+ *         description: Validation error or user exists
  */
 router.post('/register', async (req, res) => {
+  // ... (existing implementation)
   try {
     const { username, email, password } = req.body;
 
@@ -62,8 +137,8 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: existingUser.email === email.toLowerCase() 
-          ? 'Email already exists' 
+        message: existingUser.email === email.toLowerCase()
+          ? 'Email already exists'
           : 'Username already exists',
       });
     }
@@ -75,7 +150,7 @@ router.post('/register', async (req, res) => {
     // Create user (check if first user to make ADMIN)
     const userCount = await prisma.user.count();
     const isFirstUser = userCount === 0;
-    
+
     const user = await prisma.user.create({
       data: {
         username,
@@ -113,10 +188,48 @@ router.post('/register', async (req, res) => {
 });
 
 /**
- * POST /api/auth/login
- * Login user
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     token:
+ *                       type: string
+ *       401:
+ *         description: Invalid credentials
  */
 router.post('/login', async (req, res) => {
+  // ... (existing implementation)
   try {
     const { email, password } = req.body;
 
@@ -185,10 +298,31 @@ router.post('/login', async (req, res) => {
 });
 
 /**
- * GET /api/auth/me
- * Get current user profile
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user profile
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
  */
 router.get('/me', authenticate, async (req, res) => {
+  // ... (existing implementation)
   try {
     res.json({
       success: true,
@@ -205,10 +339,7 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/forgot-password
- * Request password reset (generates reset token)
- */
+// ... (Rest of existing routes without Swagger for now, or add if needed)
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -265,10 +396,6 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/reset-password
- * Reset password with token
- */
 router.post('/reset-password', async (req, res) => {
   try {
     const { email, resetToken, newPassword } = req.body;
@@ -333,10 +460,6 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-/**
- * PUT /api/auth/profile
- * Update user profile (username, avatarUrl)
- */
 router.put('/profile', authenticate, async (req, res) => {
   try {
     const { username, avatarUrl } = req.body;
@@ -415,10 +538,6 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/change-password
- * Change password (requires current password)
- */
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;

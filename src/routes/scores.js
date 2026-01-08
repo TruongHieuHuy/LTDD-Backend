@@ -5,18 +5,115 @@ const { authenticateToken: authenticate } = require('../middleware/auth');
 const router = express.Router();
 
 /**
- * POST /api/scores
- * Save new game score
+ * @swagger
+ * tags:
+ *   name: Scores
+ *   description: Game scores management
+ */
+
+/**
+ * @swagger
+ * /api/scores:
+ *   post:
+ *     summary: Submit a new game score
+ *     tags: [Scores]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - gameType
+ *               - difficulty
+ *             properties:
+ *               gameType:
+ *                 type: string
+ *                 enum: [rubik, sudoku, caro, puzzle]
+ *               difficulty:
+ *                 type: string
+ *                 enum: [easy, medium, hard, expert]
+ *               score:
+ *                 type: integer
+ *                 description: Required for non-Rubik games, or can be auto-calculated
+ *               timeSpent:
+ *                 type: integer
+ *                 description: Seconds spent. Required for Rubik.
+ *               moves:
+ *                 type: integer
+ *                 description: Moves count. Required for Rubik.
+ *               attempts:
+ *                 type: integer
+ *                 default: 1
+ *               gameData:
+ *                 type: object
+ *                 description: Additional JSON data
+ *     responses:
+ *       201:
+ *         description: Score saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     score:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         score:
+ *                           type: integer
  */
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { gameType, score, attempts, difficulty, timeSpent, gameData } = req.body;
+    const { gameType, score, attempts, difficulty, timeSpent, gameData, moves } = req.body;
 
-    // Validate required fields
-    if (!gameType || score === undefined || !difficulty) {
+    // Special handling for Rubik: Calculate score validation
+    let calculatedScore = score;
+    let finalGameData = gameData || {};
+
+    if (gameType === 'rubik') {
+      if (timeSpent === undefined || moves === undefined) {
+        if (score === undefined) {
+          return res.status(400).json({
+            success: false,
+            message: 'Rubik game requires timeSpent and moves to calculate score',
+          });
+        }
+      } else {
+        // Calculate Rubik score server-side
+        // Formula: Base (10000) - Time * 2 - Moves * 5
+        // Multiplier: Easy(1), Medium(1.5), Hard(2), Expert(3)
+        const diffMultipliers = {
+          'easy': 1,
+          'medium': 1.5,
+          'hard': 2,
+          'expert': 3
+        };
+        const multiplier = diffMultipliers[difficulty] || 1;
+
+        let rawScore = 10000 - (parseInt(timeSpent) * 2) - (parseInt(moves) * 5);
+        if (rawScore < 0) rawScore = 0;
+
+        calculatedScore = Math.floor(rawScore * multiplier);
+
+        // Store moves in gameData
+        finalGameData = { ...finalGameData, moves: parseInt(moves) };
+      }
+    }
+
+    // Validate request: require score if it wasn't calculated above
+    if (!gameType || (calculatedScore === undefined && score === undefined) || !difficulty) {
       return res.status(400).json({
         success: false,
-        message: 'gameType, score, and difficulty are required',
+        message: 'gameType, score (or timeSpent/moves for rubik), and difficulty are required',
       });
     }
 
@@ -43,11 +140,11 @@ router.post('/', authenticate, async (req, res) => {
       data: {
         userId: req.userId,
         gameType,
-        score: parseInt(score),
+        score: parseInt(calculatedScore),
         attempts: attempts ? parseInt(attempts) : 1,
         difficulty,
         timeSpent: timeSpent ? parseInt(timeSpent) : 0,
-        gameData: gameData || null,
+        gameData: finalGameData,
         syncedAt: new Date(),
       },
     });
@@ -57,7 +154,7 @@ router.post('/', authenticate, async (req, res) => {
       where: { id: req.userId },
       data: {
         totalGamesPlayed: { increment: 1 },
-        totalScore: { increment: parseInt(score) },
+        totalScore: { increment: parseInt(calculatedScore) },
       },
     });
 
@@ -89,8 +186,33 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/scores
- * Get user's game scores with filters
+ * @swagger
+ * /api/scores:
+ *   get:
+ *     summary: Get user scores
+ *     tags: [Scores]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: gameType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: difficulty
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of scores
  */
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -141,8 +263,27 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/scores/leaderboard
- * Get global leaderboard
+ * @swagger
+ * /api/scores/leaderboard:
+ *   get:
+ *     summary: Get leaderboard
+ *     tags: [Scores]
+ *     parameters:
+ *       - in: query
+ *         name: gameType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: difficulty
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Global leaderboard
  */
 router.get('/leaderboard', async (req, res) => {
   try {
