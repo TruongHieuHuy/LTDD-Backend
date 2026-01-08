@@ -3,6 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
+const logger = require('./config/logger');
+const { generalLimiter, authLimiter, scoreLimiter, postLimiter } = require('./middleware/rate-limiter');
+const { errorHandler } = require('./middleware/error-handler');
+const { sanitizeInput } = require('./middleware/sanitize');
 const authRoutes = require('./routes/auth');
 const scoresRoutes = require('./routes/scores');
 const friendsRoutes = require('./routes/friends');
@@ -10,7 +14,11 @@ const messagesRoutes = require('./routes/messages');
 const postsRoutes = require('./routes/posts');
 const uploadRoutes = require('./routes/upload');
 const achievementsRoutes = require('./routes/achievements');
+const usersRoutes = require('./routes/users');
+const challengesRoutes = require('./routes/challenges');
 const path = require('path');
+
+const sudokuRoutes = require('./routes/sudoku');
 
 const app = express();
 
@@ -22,16 +30,17 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Input sanitization (apply globally)
+app.use(sanitizeInput);
+
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Request logging middleware (development only)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    next();
-  });
-}
+// Request logging middleware
+app.use((req, res, next) => {
+  logger.info({ req: { method: req.method, url: req.path, ip: req.ip } }, 'Incoming request');
+  next();
+});
 
 // ==================== DATABASE CONNECTION ====================
 connectDB();
@@ -65,17 +74,30 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/scores', scoresRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/scores', authenticateToken, scoreLimiter, scoresRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/friends', authenticateToken, friendsRoutes);
 app.use('/api/messages', authenticateToken, messagesRoutes);
-app.use('/api/posts', authenticateToken, postsRoutes);
+app.use('/api/posts', authenticateToken, postLimiter, postsRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 
 // Achievements routes (some require auth, some are public)
 app.use('/api/achievements', achievementsRoutes);
+
+// Users routes (profile management)
+app.use('/api/users', usersRoutes);
+
+//
+app.use('/api/auth', authRoutes);
+app.use('/api/scores', scoresRoutes);
+
+
+app.use('/api/sudoku', sudokuRoutes);
+
+// Challenge routes (PK system)
+app.use('/api/challenges', authenticateToken, challengesRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler
@@ -87,31 +109,43 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { error: err.message }),
-  });
-});
+app.use(errorHandler);
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3000;
 
-const httpServer = app.listen(PORT, () => {
-  console.log('='.repeat(50));
-  console.log('🚀 Server running on port', PORT);
-  console.log('📝 Environment:', process.env.NODE_ENV || 'development');
-  console.log('🌐 Base URL: http://localhost:' + PORT);
-  console.log('='.repeat(50));
-});
+async function startServer() {
+  const httpServer = app.listen(PORT, () => {
+    logger.info('='.repeat(50));
+    logger.info(`🚀 Server running on port ${PORT}`);
+    logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🌐 Base URL: http://localhost:${PORT}`);
 
-// ==================== SOCKET.IO SETUP ====================
-const { initializeSocket } = require('./config/socket');
-const io = initializeSocket(httpServer);
+    // Add CORS warning for production
+    if (process.env.NODE_ENV === 'production' && (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*')) {
+      logger.warn('==================== SECURITY WARNING ====================');
+      logger.warn('CORS_ORIGIN is not set or is a wildcard (*).');
+      logger.warn('This is insecure for production. Set it to your frontend domain.');
+      logger.warn('========================================================');
+    }
+    logger.info('='.repeat(50));
+  });
 
-// Make io accessible to routes
-app.set('io', io);
+  // ==================== SOCKET.IO SETUP ====================
+  try {
+    const { initializeSocket } = require('./config/socket');
+    const io = await initializeSocket(httpServer);
 
-console.log('💬 Real-time chat enabled');
+    // Make io accessible to routes
+    app.set('io', io);
+    logger.info('💬 Real-time chat enabled with Redis Adapter.');
+  } catch (error) {
+    logger.error({ err: error }, '❌ Failed to initialize Socket.IO with Redis');
+    process.exit(1);
+  }
+}
+
+
+
+
+startServer();

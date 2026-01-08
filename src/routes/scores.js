@@ -118,11 +118,42 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Validate gameType enum
-    const validGameTypes = ['rubik', 'sudoku', 'caro', 'puzzle'];
+    const validGameTypes = [
+      'guess_number', 'cows_bulls', 'memory_match', 'quick_math',
+      'rubik', 'sudoku', 'caro', 'puzzle'
+    ];
     if (!validGameTypes.includes(gameType)) {
       return res.status(400).json({
         success: false,
         message: `Invalid gameType. Must be one of: ${validGameTypes.join(', ')}`,
+      });
+    }
+
+    // Validate score range (general)
+    if (score < 0 || score > 1000000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Score must be between 0 and 1,000,000',
+      });
+    }
+
+    // Game-specific maximum scores
+    const maxScores = {
+      guess_number: 10000,
+      cows_bulls: 50000,
+      quick_math: 99999,
+      memory_match: 5000,
+      rubik: 100000,
+      sudoku: 100000,
+      caro: 50000,
+      puzzle: 50000,
+    };
+
+    const maxScore = maxScores[gameType] || 1000000;
+    if (score > maxScore) {
+      return res.status(400).json({
+        success: false,
+        message: `Score exceeds maximum (${maxScore}) for ${gameType}`,
       });
     }
 
@@ -287,12 +318,53 @@ router.get('/', authenticate, async (req, res) => {
  */
 router.get('/leaderboard', async (req, res) => {
   try {
-    const { gameType, difficulty, limit = 10 } = req.query;
+    const {
+      gameType = 'all',
+      difficulty,
+      period = 'all-time',
+      limit = 100
+    } = req.query;
 
     // Build query filters
     const where = {};
-    if (gameType && gameType !== 'all') where.gameType = gameType;
-    if (difficulty && difficulty !== 'all') where.difficulty = difficulty;
+
+    // Filter by game type
+    if (gameType && gameType !== 'all') {
+      where.gameType = gameType.toUpperCase();
+    }
+
+    // Filter by difficulty
+    if (difficulty && difficulty !== 'all') {
+      where.difficulty = difficulty.toUpperCase();
+    }
+
+    // Filter by time period
+    if (period !== 'all-time') {
+      const now = new Date();
+      let startDate;
+
+      switch (period) {
+        case 'daily':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          break;
+        case 'weekly':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          startDate = weekAgo;
+          break;
+        case 'monthly':
+          const monthAgo = new Date(now);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          startDate = monthAgo;
+          break;
+        default:
+          break; // all-time - no filter
+      }
+
+      if (startDate) {
+        where.createdAt = { gte: startDate };
+      }
+    }
 
     // Fetch top scores
     const leaderboard = await prisma.gameScore.findMany({
@@ -305,15 +377,53 @@ router.get('/leaderboard', async (req, res) => {
             id: true,
             username: true,
             avatarUrl: true,
+            totalScore: true,
+            totalGamesPlayed: true
           },
         },
       },
     });
 
+    // Add ranks
+    const rankedLeaderboard = leaderboard.map((entry, index) => ({
+      rank: index + 1,
+      ...entry
+    }));
+
+    // Calculate personal rank if user is authenticated
+    let personalRank = null;
+    if (req.userId) {
+      // Get user's best score with same filters
+      const userBestScore = await prisma.gameScore.findFirst({
+        where: {
+          ...where,
+          userId: req.userId
+        },
+        orderBy: { score: 'desc' }
+      });
+
+      if (userBestScore) {
+        // Count how many scores are better
+        const betterCount = await prisma.gameScore.count({
+          where: {
+            ...where,
+            score: { gt: userBestScore.score }
+          }
+        });
+        personalRank = betterCount + 1;
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        leaderboard,
+        leaderboard: rankedLeaderboard,
+        personalRank,
+        filters: {
+          gameType,
+          period,
+          difficulty: difficulty || null
+        }
       },
     });
   } catch (error) {

@@ -116,11 +116,13 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Validate password length
-    if (password.length < 6) {
+    // Validate password strength
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters',
+        message: 'Password validation failed',
+        errors: passwordErrors,
       });
     }
 
