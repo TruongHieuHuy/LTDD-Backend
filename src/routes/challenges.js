@@ -146,12 +146,24 @@ router.get('/pending', authenticateToken, async (req, res, next) => {
     try {
         const challenges = await prisma.challenge.findMany({
             where: {
-                opponentId: req.user.id,
+                OR: [
+                    { opponentId: req.user.id }, // Challenges received
+                    { creatorId: req.user.id }   // Challenges sent
+                ],
                 status: 'PENDING',
                 expiresAt: { gt: new Date() } // Not expired
             },
             include: {
                 creator: {
+                    select: {
+                        id: true,
+                        username: true,
+                        avatarUrl: true,
+                        totalScore: true,
+                        totalGamesPlayed: true
+                    }
+                },
+                opponent: {
                     select: {
                         id: true,
                         username: true,
