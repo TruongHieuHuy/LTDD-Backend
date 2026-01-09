@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
 const { authenticateToken: authenticate } = require('../middleware/auth');
+const TwoFactorController = require('../controllers/two-factor-controller');
+const { authenticator } = require('otplib');
 
 const router = express.Router();
 
@@ -15,6 +17,20 @@ const generateToken = (userId, expiresIn = process.env.JWT_EXPIRES_IN || '30d') 
     process.env.JWT_SECRET,
     { expiresIn }
   );
+};
+
+/**
+ * Validate password strength
+ * @param {string} password 
+ * @returns {Array} List of error messages
+ */
+const validatePassword = (password) => {
+  const errors = [];
+  if (password.length < 6) {
+    errors.push('Password must be at least 6 characters');
+  }
+  // Add more rules if needed
+  return errors;
 };
 
 /**
@@ -271,6 +287,18 @@ router.post('/login', async (req, res) => {
       data: { lastLoginAt: new Date() },
     });
 
+    // Check if 2FA is enabled
+    if (user.isTwoFactorEnabled) {
+      return res.json({
+        success: true,
+        data: {
+          requiresTwoFactor: true,
+          userId: user.id,
+          message: 'Enter OTP code from authenticator app'
+        }
+      });
+    }
+
     // Generate token
     const token = generateToken(user.id, rememberMe ? '30d' : '1d');
 
@@ -290,6 +318,7 @@ router.post('/login', async (req, res) => {
         token,
       },
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
@@ -605,5 +634,90 @@ router.post('/change-password', authenticate, async (req, res) => {
     });
   }
 });
+
+/* ==================== 2FA ROUTES ==================== */
+
+/**
+ * @swagger
+ * /api/auth/login-2fa:
+ *   post:
+ *     summary: Complete login with 2FA code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - code
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid code
+ */
+router.post('/login-2fa', async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({ message: 'UserId and code are required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // specific check for 2FA validation
+    const isValid = authenticator.verify({
+      token: code,
+      secret: user.twoFactorSecret
+    });
+
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid 2FA code' });
+    }
+
+    // Generate token
+    const token = generateToken(user.id);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          totalGamesPlayed: user.totalGamesPlayed,
+          totalScore: user.totalScore,
+        },
+        token,
+      },
+    });
+
+  } catch (error) {
+    console.error('2FA Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 2FA Management Routes
+router.post('/two-factor/enable', authenticate, TwoFactorController.enable2FA);
+router.post('/two-factor/verify', authenticate, TwoFactorController.verify2FA);
+router.post('/two-factor/disable', authenticate, TwoFactorController.disable2FA);
 
 module.exports = router;
