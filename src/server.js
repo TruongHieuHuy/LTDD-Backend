@@ -148,11 +148,12 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
-  const httpServer = app.listen(PORT, () => {
+  const httpServer = app.listen(PORT, '0.0.0.0', () => {
     logger.info('='.repeat(50));
     logger.info(`🚀 Server running on port ${PORT}`);
     logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`🌐 Base URL: http://localhost:${PORT}`);
+    logger.info(`🌐 Local URL: http://localhost:${PORT}`);
+    logger.info(`🌐 Network URL: http://0.0.0.0:${PORT} (accessible from LAN)`);
 
     // Add CORS warning for production
     if (process.env.NODE_ENV === 'production' && (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*')) {
