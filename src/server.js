@@ -16,6 +16,14 @@ const uploadRoutes = require('./routes/upload');
 const achievementsRoutes = require('./routes/achievements');
 const usersRoutes = require('./routes/users');
 const challengesRoutes = require('./routes/challenges');
+
+// Game routes
+const guessNumberRoutes = require('./routes/games/guess-number');
+const cowsBullsRoutes = require('./routes/games/cows-bulls');
+const memoryMatchRoutes = require('./routes/games/memory-match');
+const quickMathRoutes = require('./routes/games/quick-math');
+
+const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
 
 const sudokuRoutes = require('./routes/sudoku'); 
@@ -57,6 +65,7 @@ app.get('/', (req, res) => {
   res.json({
     message: '🎮 Game Mobile API - Server is running!',
     version: '1.0.0',
+    documentation: '/api-docs',
     endpoints: {
       auth: '/api/auth',
       scores: '/api/scores',
@@ -65,15 +74,36 @@ app.get('/', (req, res) => {
       posts: '/api/posts',
       upload: '/api/upload',
       achievements: '/api/achievements',
+      users: '/api/users',
+      challenges: '/api/challenges',
+      games: {
+        guessNumber: '/api/games/guess-number',
+        cowsBulls: '/api/games/cows-bulls',
+        memoryMatch: '/api/games/memory-match',
+        quickMath: '/api/games/quick-math',
+      },
     },
   });
 });
+
 
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
   });
+});
+
+// ==================== API DOCUMENTATION ====================
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: '🎮 Mini Game Center API Docs',
+}));
+
+// Redirect /docs to /api-docs
+app.get('/docs', (req, res) => {
+  res.redirect('/api-docs');
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
@@ -100,6 +130,12 @@ app.use('/api/sudoku', sudokuRoutes);
 
 // Challenge routes (PK system)
 app.use('/api/challenges', authenticateToken, challengesRoutes);
+
+// Game logic routes (protected, require auth)
+app.use('/api/games/guess-number', authenticateToken, generalLimiter, guessNumberRoutes);
+app.use('/api/games/cows-bulls', authenticateToken, generalLimiter, cowsBullsRoutes);
+app.use('/api/games/memory-match', authenticateToken, generalLimiter, memoryMatchRoutes);
+app.use('/api/games/quick-math', authenticateToken, generalLimiter, quickMathRoutes);
 
 // ==================== ERROR HANDLING ====================
 // 404 handler
