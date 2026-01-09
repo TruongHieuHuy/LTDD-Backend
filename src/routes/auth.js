@@ -9,11 +9,11 @@ const router = express.Router();
 /**
  * Generate JWT token
  */
-const generateToken = (userId) => {
+const generateToken = (userId, expiresIn = process.env.JWT_EXPIRES_IN || '30d') => {
   return jwt.sign(
     { userId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+    { expiresIn }
   );
 };
 
@@ -233,7 +233,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   // ... (existing implementation)
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -272,7 +272,7 @@ router.post('/login', async (req, res) => {
     });
 
     // Generate token
-    const token = generateToken(user.id);
+    const token = generateToken(user.id, rememberMe ? '30d' : '1d');
 
     res.json({
       success: true,

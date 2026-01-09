@@ -113,6 +113,7 @@ const options = {
                     properties: {
                         email: { type: 'string', format: 'email', example: 'player@example.com' },
                         password: { type: 'string', example: 'Password@123' },
+                        rememberMe: { type: 'boolean', example: false, description: 'True = 30 days token, False = 1 day' },
                     },
                 },
 
