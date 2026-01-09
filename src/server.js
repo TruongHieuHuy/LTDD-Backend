@@ -26,7 +26,7 @@ const quickMathRoutes = require('./routes/games/quick-math');
 const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
 
-const sudokuRoutes = require('./routes/sudoku'); 
+const sudokuRoutes = require('./routes/sudoku');
 
 const app = express();
 
@@ -53,12 +53,10 @@ app.use((req, res, next) => {
 // ==================== DATABASE CONNECTION ====================
 connectDB();
 
-// Start challenge cleanup cron job
-const { startChallengeCleanupCron } = require('./utils/challenge-cleanup-cron');
-startChallengeCleanupCron();
-
-// ==================== RATE LIMITING ====================
-app.use('/api/', generalLimiter);
+// ==================== SWAGGER CONFIG ====================
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ==================== ROUTES ====================
 app.get('/', (req, res) => {
