@@ -1,5 +1,4 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-
 const swaggerUi = require('swagger-ui-express');
 
 /**
@@ -10,15 +9,6 @@ const options = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'Game Mobile API',
-            version: '1.0.0',
-            description: 'API documentation for the Game Mobile Backend application',
-        },
-        servers: [
-            {
-                url: 'http://localhost:3000',
-                description: 'Development Server',
-            },
             title: '🎮 Mini Game Center API',
             version: '1.0.0',
             description: `
@@ -53,21 +43,6 @@ const options = {
                     type: 'http',
                     scheme: 'bearer',
                     bearerFormat: 'JWT',
-                },
-            },
-        },
-        security: [
-            {
-                bearerAuth: [],
-            },
-        ],
-    },
-    apis: ['./src/routes/*.js'], // Path to the API docs
-};
-
-const swaggerSpec = swaggerJsdoc(options);
-
-module.exports = swaggerSpec;
                     description: 'JWT Authorization header using Bearer scheme. Example: "Bearer {token}"',
                 },
             },
@@ -346,6 +321,11 @@ module.exports = swaggerSpec;
                 },
             },
         },
+        security: [
+            {
+                bearerAuth: [],
+            },
+        ],
         tags: [
             { name: '🔐 Authentication', description: 'User authentication and profile management' },
             { name: '👤 Users', description: 'User profile and avatar management' },
@@ -362,7 +342,12 @@ module.exports = swaggerSpec;
 };
 
 // Add all API paths
-options.definition.paths = require('./swagger-paths');
+try {
+    options.definition.paths = require('./swagger-paths');
+} catch (error) {
+    // If swagger-paths doesn't exist, continue without it
+    options.definition.paths = {};
+}
 
 const swaggerSpec = swaggerJsdoc(options);
 
