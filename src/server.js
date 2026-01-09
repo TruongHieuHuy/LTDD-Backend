@@ -54,10 +54,7 @@ app.use((req, res, next) => {
 // ==================== DATABASE CONNECTION ====================
 connectDB();
 
-// ==================== SWAGGER CONFIG ====================
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./config/swagger');
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 
 // ==================== ROUTES ====================
 app.get('/', (req, res) => {
@@ -125,6 +122,10 @@ app.use('/api/challenges', authenticateToken, challengesRoutes);
 
 
 app.use('/api/puzzle', puzzleRoutes);
+
+// Sudoku routes
+app.use('/api/sudoku', sudokuRoutes);
+
 // Game logic routes (protected, require auth)
 app.use('/api/games/guess-number', authenticateToken, generalLimiter, guessNumberRoutes);
 app.use('/api/games/cows-bulls', authenticateToken, generalLimiter, cowsBullsRoutes);
