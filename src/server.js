@@ -25,6 +25,7 @@ const quickMathRoutes = require('./routes/games/quick-math');
 
 const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
+const puzzleRoutes = require('./routes/puzzle');
 
 const sudokuRoutes = require('./routes/sudoku');
 
@@ -119,16 +120,11 @@ app.use('/api/achievements', achievementsRoutes);
 // Users routes (profile management)
 app.use('/api/users', usersRoutes);
 
-//
-app.use('/api/auth', authRoutes);
-app.use('/api/scores', scoresRoutes);
-
-
-app.use('/api/sudoku', sudokuRoutes);
-
 // Challenge routes (PK system)
 app.use('/api/challenges', authenticateToken, challengesRoutes);
 
+
+app.use('/api/puzzle', puzzleRoutes);
 // Game logic routes (protected, require auth)
 app.use('/api/games/guess-number', authenticateToken, generalLimiter, guessNumberRoutes);
 app.use('/api/games/cows-bulls', authenticateToken, generalLimiter, cowsBullsRoutes);
@@ -180,8 +176,5 @@ async function startServer() {
     process.exit(1);
   }
 }
-
-
-
 
 startServer();
