@@ -55,6 +55,7 @@ model User {
   // Achievement relations
   userAchievements UserAchievement[]
   
+ 
   @@map("users")
 }
 

@@ -16,6 +16,7 @@ const uploadRoutes = require('./routes/upload');
 const achievementsRoutes = require('./routes/achievements');
 const usersRoutes = require('./routes/users');
 const path = require('path');
+const caroRoutes = require('./routes/caro'); // 👈 NEW
 
 const sudokuRoutes = require('./routes/sudoku'); 
 
@@ -92,6 +93,9 @@ app.use('/api/scores', scoresRoutes);
 
 
 app.use('/api/sudoku', sudokuRoutes);
+
+
+app.use('/api/caro', caroRoutes); 
 
 
 // ==================== ERROR HANDLING ====================
