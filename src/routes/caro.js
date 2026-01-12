@@ -211,6 +211,8 @@ function minimax(board, size, depth, alpha, beta, isMaximizing, aiPlayer, humanP
   }
 }
 
+
+
 // Tìm nước đi tốt nhất
 function findBestMove(board, size, difficulty, aiPlayer, humanPlayer) {
   const moves = getPossibleMoves(board, size);
