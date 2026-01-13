@@ -1560,7 +1560,7 @@ module.exports = {
     // ==================== GAME LOGIC ENDPOINTS ====================
     '/games/guess-number/start': {
         post: {
-            tags: ['🎮 Game Logic'],
+            tags: ['🎮 Game Online/Offline'],
             summary: 'Start Guess Number game',
             description: 'Create new Guess Number game session. Secret number stored server-side only.',
             security: [{ bearerAuth: [] }],
