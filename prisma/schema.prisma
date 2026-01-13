@@ -19,9 +19,14 @@ model User {
   avatarUrl String?  @db.VarChar(500)
   role      UserRole @default(USER) // Role-based access control
   
+  // 2FA
+  isTwoFactorEnabled Boolean @default(false)
+  twoFactorSecret    String? @db.VarChar(100)
+  
   // Statistics
   totalGamesPlayed Int @default(0)
   totalScore       Int @default(0)
+  coins            Int @default(1000) // Virtual currency for betting
   
   // Password reset
   resetToken       String?   @db.VarChar(255)
@@ -56,6 +61,14 @@ model User {
   userAchievements UserAchievement[]
   
  
+  // Challenge relations
+  challengesCreated  Challenge[] @relation("ChallengeCreator")
+  challengesReceived Challenge[] @relation("ChallengeOpponent")
+  challengesWon      Challenge[] @relation("ChallengeWinner")
+  
+  // Game session relations
+  gameSessions GameSession[]
+  
   @@map("users")
 }
 
@@ -156,8 +169,17 @@ model Message {
 // ==================== ENUMS ====================
 enum UserRole {
   USER
-  ADMIN
   MODERATOR
+  ADMIN
+}
+
+// ==================== CHALLENGE STATUS ====================
+enum ChallengeStatus {
+  PENDING   // Waiting for opponent to accept
+  ACTIVE    // Accepted and in progress (voting or playing)
+  COMPLETED // Finished with winner/draw
+  EXPIRED   // Timed out (not accepted within expiresAt)
+  CANCELLED // Creator cancelled or opponent rejected
 }
 
 enum GameType {
@@ -192,6 +214,15 @@ enum MessageType {
   image
   file
 }
+
+// ==================== SESSION STATUS ====================
+enum SessionStatus {
+  ACTIVE      // Game in progress
+  COMPLETED   // Finished normally
+  EXPIRED     // Timeout
+  ABANDONED   // User left
+}
+
 
 // ==================== POST MODEL ====================
 model Post {
@@ -353,6 +384,113 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId, isUnlocked])
   @@map("user_achievements")
+}
+
+// ==================== CHALLENGE (PK) MODEL ====================
+model Challenge {
+  id          String   @id @default(uuid())
+  creatorId   String
+  opponentId  String?  // Null until someone accepts
+  
+  // Betting
+  betAmount   Int      @default(100) // Coins wagered
+  
+  // Game tracking (Best of 3)
+  totalGames     Int @default(3)
+  currentGame    Int @default(1)
+  gamesCompleted Int @default(0)
+  
+  // Game votes and types for each round
+  game1Type          String?
+  game1CreatorVote   String?
+  game1OpponentVote  String?
+  
+  game2Type          String?
+  game2CreatorVote   String?
+  game2OpponentVote  String?
+  
+  game3Type          String?
+  game3CreatorVote   String?
+  game3OpponentVote  String?
+  
+  // Scores for each game
+  game1CreatorScore  Int @default(0)
+  game1OpponentScore Int @default(0)
+  game1Completed     Boolean @default(false)
+  
+  game2CreatorScore  Int @default(0)
+  game2OpponentScore Int @default(0)
+  game2Completed     Boolean @default(false)
+  
+  game3CreatorScore  Int @default(0)
+  game3OpponentScore Int @default(0)
+  game3Completed     Boolean @default(false)
+  
+  // Overall scores (wins count)
+  creatorWins   Int @default(0)
+  opponentWins  Int @default(0)
+  
+  // Winner
+  winnerId       String?
+  isDraw         Boolean @default(false)
+  
+  // State and timestamps
+  status      ChallengeStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  acceptedAt  DateTime?
+  expiresAt   DateTime // Auto-cancel if not accepted by this time
+  completedAt DateTime?
+  cancelledAt DateTime?
+  
+  // Metadata
+  creatorForfeit   Boolean @default(false)
+  opponentForfeit  Boolean @default(false)
+  
+  // Relations
+  creator  User  @relation("ChallengeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  opponent User? @relation("ChallengeOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  winner   User? @relation("ChallengeWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  
+  // Indexes for performance
+  @@index([creatorId, status])
+  @@index([opponentId, status])
+  @@index([status, expiresAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("challenges")
+}
+
+// ==================== GAME SESSION MODEL ====================
+model GameSession {
+  id         String   @id @default(uuid())
+  userId     String
+  gameType   GameType
+  difficulty Difficulty
+  
+  // Session data (game-specific state stored as JSON)
+  // Structure varies per game - see implementation plan
+  sessionData Json    @db.JsonB
+  
+  // Server-tracked metadata
+  status      SessionStatus @default(ACTIVE)
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime // Auto-expire after 1 hour
+  
+  // Results (filled when session completes)
+  score       Int? // Final score
+  moves       Int? // For memory match tracking
+  timeSpent   Int? // Server-calculated in seconds
+  
+  // Anti-cheat tracking
+  suspiciousActivity Json? @db.JsonB // Array of flags/warnings
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Indexes for performance
+  @@index([userId, gameType, status])
+  @@index([status, expiresAt]) // For cleanup job
+  @@map("game_sessions")
 }
 
 // ==================== ENUMS ====================

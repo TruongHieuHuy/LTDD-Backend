@@ -3,54 +3,116 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
 const { authenticateToken: authenticate } = require('../middleware/auth');
+const TwoFactorController = require('../controllers/two-factor-controller');
+const { authenticator } = require('otplib');
 
 const router = express.Router();
 
 /**
  * Generate JWT token
  */
-const generateToken = (userId) => {
+const generateToken = (userId, expiresIn = process.env.JWT_EXPIRES_IN || '30d') => {
   return jwt.sign(
     { userId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+    { expiresIn }
   );
 };
 
 /**
  * Validate password strength
+ * @param {string} password 
+ * @returns {Array} List of error messages
  */
 const validatePassword = (password) => {
   const errors = [];
-
-  if (password.length < 8) {
-    errors.push('Password must be at least 8 characters');
+  if (password.length < 6) {
+    errors.push('Password must be at least 6 characters');
   }
-
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter');
-  }
-
-  if (!/[0-9]/.test(password)) {
-    errors.push('Password must contain at least one number');
-  }
-
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
-  }
-
+  // Add more rules if needed
   return errors;
 };
 
 /**
- * POST /api/auth/register
- * Register new user
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: The auto-generated id of the user
+ *         username:
+ *           type: string
+ *         email:
+ *           type: string
+ *         role:
+ *           type: string
+ *           enum: [USER, ADMIN, MODERATOR]
+ *       example:
+ *         id: d5fE_asz
+ *         username: johndoe
+ *         email: john@test.com
+ *         role: USER
+ */
+
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: User authentication
+ */
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 20
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *     responses:
+ *       201:
+ *         description: The user was successfully created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     token:
+ *                       type: string
+ *       400:
+ *         description: Validation error or user exists
  */
 router.post('/register', async (req, res) => {
+  // ... (existing implementation)
   try {
     const { username, email, password } = req.body;
 
@@ -144,12 +206,50 @@ router.post('/register', async (req, res) => {
 });
 
 /**
- * POST /api/auth/login
- * Login user
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     token:
+ *                       type: string
+ *       401:
+ *         description: Invalid credentials
  */
 router.post('/login', async (req, res) => {
+  // ... (existing implementation)
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -187,8 +287,20 @@ router.post('/login', async (req, res) => {
       data: { lastLoginAt: new Date() },
     });
 
+    // Check if 2FA is enabled
+    if (user.isTwoFactorEnabled) {
+      return res.json({
+        success: true,
+        data: {
+          requiresTwoFactor: true,
+          userId: user.id,
+          message: 'Enter OTP code from authenticator app'
+        }
+      });
+    }
+
     // Generate token
-    const token = generateToken(user.id);
+    const token = generateToken(user.id, rememberMe ? '30d' : '1d');
 
     res.json({
       success: true,
@@ -206,6 +318,7 @@ router.post('/login', async (req, res) => {
         token,
       },
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
@@ -216,10 +329,31 @@ router.post('/login', async (req, res) => {
 });
 
 /**
- * GET /api/auth/me
- * Get current user profile
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user profile
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
  */
 router.get('/me', authenticate, async (req, res) => {
+  // ... (existing implementation)
   try {
     res.json({
       success: true,
@@ -236,10 +370,7 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/forgot-password
- * Request password reset (generates reset token)
- */
+// ... (Rest of existing routes without Swagger for now, or add if needed)
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -296,10 +427,6 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/reset-password
- * Reset password with token
- */
 router.post('/reset-password', async (req, res) => {
   try {
     const { email, resetToken, newPassword } = req.body;
@@ -364,10 +491,6 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-/**
- * PUT /api/auth/profile
- * Update user profile (username, avatarUrl)
- */
 router.put('/profile', authenticate, async (req, res) => {
   try {
     const { username, avatarUrl } = req.body;
@@ -446,10 +569,6 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/change-password
- * Change password (requires current password)
- */
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -515,5 +634,90 @@ router.post('/change-password', authenticate, async (req, res) => {
     });
   }
 });
+
+/* ==================== 2FA ROUTES ==================== */
+
+/**
+ * @swagger
+ * /api/auth/login-2fa:
+ *   post:
+ *     summary: Complete login with 2FA code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - code
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid code
+ */
+router.post('/login-2fa', async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({ message: 'UserId and code are required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // specific check for 2FA validation
+    const isValid = authenticator.verify({
+      token: code,
+      secret: user.twoFactorSecret
+    });
+
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid 2FA code' });
+    }
+
+    // Generate token
+    const token = generateToken(user.id);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          totalGamesPlayed: user.totalGamesPlayed,
+          totalScore: user.totalScore,
+        },
+        token,
+      },
+    });
+
+  } catch (error) {
+    console.error('2FA Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 2FA Management Routes
+router.post('/two-factor/enable', authenticate, TwoFactorController.enable2FA);
+router.post('/two-factor/verify', authenticate, TwoFactorController.verify2FA);
+router.post('/two-factor/disable', authenticate, TwoFactorController.disable2FA);
 
 module.exports = router;
