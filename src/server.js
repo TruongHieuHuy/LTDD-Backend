@@ -30,6 +30,7 @@ const puzzleRoutes = require('./routes/puzzle');
 const rubikRoutes = require('./routes/rubik');
 
 const sudokuRoutes = require('./routes/sudoku');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -103,25 +104,17 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 app.get('/docs', (req, res) => {
   res.redirect('/api-docs');
 });
-
+// Feature Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/scores', authenticateToken, scoreLimiter, scoresRoutes);
-
-// Protected routes (require authentication)
-app.use('/api/friends', authenticateToken, friendsRoutes);
-app.use('/api/messages', authenticateToken, messagesRoutes);
+app.use('/api/friends', authenticateToken, generalLimiter, friendsRoutes);
+app.use('/api/messages', authenticateToken, generalLimiter, messagesRoutes);
 app.use('/api/posts', authenticateToken, postLimiter, postsRoutes);
-app.use('/api/upload', authenticateToken, uploadRoutes);
-
-// Achievements routes (some require auth, some are public)
-app.use('/api/achievements', achievementsRoutes);
-
-// Users routes (profile management)
-app.use('/api/users', usersRoutes);
-
-// Challenge routes (PK system)
-app.use('/api/challenges', authenticateToken, challengesRoutes);
-
+app.use('/api/upload', authenticateToken, generalLimiter, uploadRoutes);
+app.use('/api/achievements', generalLimiter, achievementsRoutes);
+app.use('/api/users', generalLimiter, usersRoutes);
+app.use('/api/challenges', authenticateToken, generalLimiter, challengesRoutes);
+app.use('/api/admin', generalLimiter, adminRoutes);
 
 app.use('/api/puzzle', puzzleRoutes);
 
