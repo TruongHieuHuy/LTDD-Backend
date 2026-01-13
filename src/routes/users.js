@@ -182,6 +182,46 @@ router.put('/avatar', authenticateToken, avatarUpload.single('avatar'), async (r
     }
 });
 
+// ==================== SEARCH USERS ====================
+/**
+ * GET /api/users/search
+ * Search users by username or email
+ */
+router.get('/search', authenticateToken, async (req, res, next) => {
+    try {
+        const { query } = req.query;
+        if (!query) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const users = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { username: { contains: query, mode: 'insensitive' } },
+                    { email: { contains: query, mode: 'insensitive' } }
+                ],
+                NOT: {
+                    id: req.user.id // Exclude self
+                }
+            },
+            select: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+                totalScore: true
+            },
+            take: 20
+        });
+
+        res.json({
+            success: true,
+            data: users
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // ==================== GET USER BY ID ====================
 /**
  * GET /api/users/:userId
