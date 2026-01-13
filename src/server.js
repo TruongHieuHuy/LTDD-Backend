@@ -34,6 +34,14 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 
+// ==================== ROUTES ====================
+app.get('/debug-probe', (req, res) => {
+  res.json({
+    message: 'Antigravity probe active',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ==================== MIDDLEWARE ====================
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
@@ -43,62 +51,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Input sanitization (apply globally)
-app.use(sanitizeInput);
-
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Request logging middleware
-app.use((req, res, next) => {
-  logger.info({ req: { method: req.method, url: req.path, ip: req.ip } }, 'Incoming request');
-  next();
-});
-
-// ==================== DATABASE CONNECTION ====================
-connectDB();
-
-
-
-// ==================== ROUTES ====================
-app.get('/', (req, res) => {
-  res.json({
-    message: '🎮 Game Mobile API - Server is running!',
-    version: '1.0.0',
-    documentation: '/api-docs',
-    endpoints: {
-      auth: '/api/auth',
-      scores: '/api/scores',
-      friends: '/api/friends',
-      messages: '/api/messages',
-      posts: '/api/posts',
-      upload: '/api/upload',
-      achievements: '/api/achievements',
-      users: '/api/users',
-      challenges: '/api/challenges',
-      games: {
-        guessNumber: '/api/games/guess-number',
-        cowsBulls: '/api/games/cows-bulls',
-        memoryMatch: '/api/games/memory-match',
-        quickMath: '/api/games/quick-math',
-      },
-    },
-  });
-});
-
-
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // ==================== API DOCUMENTATION ====================
 // Swagger UI
+logger.info('Setup Swagger UI...');
+logger.info(`Swagger Spec available: ${!!swaggerSpec}`);
+if (swaggerSpec) {
+  logger.info({ info: swaggerSpec.info }, 'Swagger Spec info');
+  logger.info(`Swagger Spec paths count: ${Object.keys(swaggerSpec.paths || {}).length}`);
+}
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: '🎮 Mini Game Center API Docs',
 }));
+
+// Input sanitization (apply to API routes)
+app.use(sanitizeInput);
 
 // Redirect /docs to /api-docs
 app.get('/docs', (req, res) => {

@@ -61,9 +61,17 @@ const errorHandler = (err, req, res, next) => {
     }
 
     // Log error
-    console.error(`[ERROR] ${error.statusCode} - ${error.message}`);
-    if (!error.isOperational) {
-        console.error(error.stack);
+    logger.error({
+        err: {
+            message: error.message,
+            stack: error.stack,
+            code: error.statusCode,
+            ...error
+        }
+    }, `[ERROR] ${error.statusCode} - ${error.message}`);
+
+    if (process.env.NODE_ENV === 'development') {
+        console.error(error);
     }
 
     res.status(error.statusCode).json(response);
