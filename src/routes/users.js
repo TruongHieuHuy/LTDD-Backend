@@ -33,13 +33,27 @@ const avatarUpload = multer({
         files: 1
     },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        console.log('Avatar upload fileFilter:', {
+            originalname: file.originalname,
+            mimetype: file.mimetype,
+            fieldname: file.fieldname
+        });
 
-        if (extname && mimetype) {
+        const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        const allowedExtensions = /\.(jpg|jpeg|png)$/i;
+        
+        const hasValidMimeType = allowedMimeTypes.includes(file.mimetype);
+        const hasValidExtension = allowedExtensions.test(file.originalname);
+
+        if (hasValidExtension && hasValidMimeType) {
             cb(null, true);
         } else {
+            console.error('Avatar rejected:', {
+                hasValidExtension,
+                hasValidMimeType,
+                mimetype: file.mimetype,
+                filename: file.originalname
+            });
             cb(new Error('Only JPEG and PNG images are allowed for avatars'));
         }
     }
