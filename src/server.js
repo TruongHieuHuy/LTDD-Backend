@@ -27,6 +27,7 @@ const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
 const caroRoutes = require('./routes/caro'); // 👈 NEW
 const puzzleRoutes = require('./routes/puzzle');
+const rubikRoutes = require('./routes/rubik');
 
 const sudokuRoutes = require('./routes/sudoku');
 
@@ -133,7 +134,8 @@ app.use('/api/games/cows-bulls', authenticateToken, generalLimiter, cowsBullsRou
 app.use('/api/games/memory-match', authenticateToken, generalLimiter, memoryMatchRoutes);
 app.use('/api/games/quick-math', authenticateToken, generalLimiter, quickMathRoutes);
 
-app.use('/api/caro', caroRoutes); 
+app.use('/api/caro', caroRoutes);
+app.use('/api/rubik', rubikRoutes);
 
 
 // ==================== ERROR HANDLING ====================
