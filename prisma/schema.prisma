@@ -60,6 +60,7 @@ model User {
   // Achievement relations
   userAchievements UserAchievement[]
   
+ 
   // Challenge relations
   challengesCreated  Challenge[] @relation("ChallengeCreator")
   challengesReceived Challenge[] @relation("ChallengeOpponent")
