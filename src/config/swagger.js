@@ -337,6 +337,8 @@ const options = {
             { name: '🏅 Achievements', description: 'Achievements and badges' },
             { name: '💬 Messages', description: 'P2P messaging system' },
             { name: '📤 Upload', description: 'File upload management' },
+            { name: '🎮 Game Logic', description: 'Game sessions for Guess Number, Cows & Bulls, Memory Match, Quick Math' },
+            { name: '🎲 Puzzle & Strategy Games', description: 'Puzzle, Sudoku, Rubik Cube, and Caro games' },
             { name: '👑 Admin', description: 'Admin dashboard and management' },
         ],
     },

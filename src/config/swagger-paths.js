@@ -2293,4 +2293,801 @@ module.exports = {
             }
         }
     },
+
+    // ==================== PUZZLE & STRATEGY GAMES ====================
+    '/puzzle/generate': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Generate Puzzle game',
+            description: 'Generate image puzzle with configurable grid size. Image auto-downloaded from Picsum.',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['difficulty', 'gridSize'],
+                            properties: {
+                                difficulty: {
+                                    type: 'string',
+                                    enum: ['easy', 'medium', 'hard'],
+                                    example: 'medium',
+                                },
+                                gridSize: {
+                                    type: 'integer',
+                                    enum: [3, 4, 5],
+                                    example: 4,
+                                    description: '3x3, 4x4, or 5x5 grid',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Puzzle generated successfully',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    puzzle: {
+                                        type: 'object',
+                                        properties: {
+                                            id: { type: 'string', format: 'uuid' },
+                                            difficulty: { type: 'string' },
+                                            gridSize: { type: 'integer' },
+                                            tiles: { type: 'array', items: { type: 'integer' } },
+                                            imageUrl: { type: 'string' },
+                                            tilePaths: { type: 'array', items: { type: 'string' } },
+                                            moves: { type: 'integer', example: 0 },
+                                            startTime: { type: 'string', format: 'date-time' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                '400': { description: 'Invalid gridSize or difficulty' },
+            },
+        },
+    },
+
+    '/puzzle/calculate-score': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Calculate Puzzle score',
+            description: 'Calculate final score based on moves and time',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['difficulty', 'moves', 'timeInSeconds'],
+                            properties: {
+                                difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'] },
+                                moves: { type: 'integer', example: 50 },
+                                timeInSeconds: { type: 'integer', example: 120 },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Score calculated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    score: { type: 'integer' },
+                                    breakdown: {
+                                        type: 'object',
+                                        properties: {
+                                            baseScore: { type: 'integer' },
+                                            timePenalty: { type: 'integer' },
+                                            movePenalty: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/sudoku/generate': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Generate Sudoku game',
+            description: 'Generate valid Sudoku puzzle with solution',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['difficulty'],
+                            properties: {
+                                difficulty: {
+                                    type: 'string',
+                                    enum: ['easy', 'medium', 'hard'],
+                                    example: 'medium',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Sudoku generated successfully',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            gameId: { type: 'string' },
+                                            puzzle: {
+                                                type: 'array',
+                                                items: { type: 'integer' },
+                                                description: '81 numbers (0 = empty)',
+                                            },
+                                            solution: {
+                                                type: 'array',
+                                                items: { type: 'integer' },
+                                            },
+                                            difficulty: { type: 'string' },
+                                            createdAt: { type: 'string', format: 'date-time' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/sudoku/validate': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Validate Sudoku solution',
+            description: 'Check current state against solution and return mistakes',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['currentState', 'solution'],
+                            properties: {
+                                currentState: {
+                                    type: 'array',
+                                    items: { type: 'integer' },
+                                    minItems: 81,
+                                    maxItems: 81,
+                                },
+                                solution: {
+                                    type: 'array',
+                                    items: { type: 'integer' },
+                                    minItems: 81,
+                                    maxItems: 81,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Validation result',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            isValid: { type: 'boolean' },
+                                            mistakes: { type: 'integer' },
+                                            errors: {
+                                                type: 'array',
+                                                items: { type: 'integer' },
+                                                description: 'Indices of wrong cells',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/sudoku/hint': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Get Sudoku hint',
+            description: 'Get hint for next move (random empty cell)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['currentState', 'solution'],
+                            properties: {
+                                currentState: { type: 'array', items: { type: 'integer' } },
+                                solution: { type: 'array', items: { type: 'integer' } },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Hint provided',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            index: { type: 'integer' },
+                                            value: { type: 'integer' },
+                                            row: { type: 'integer' },
+                                            col: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/sudoku/calculate-score': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Calculate Sudoku score',
+            description: 'Calculate final score based on difficulty, time, hints, and mistakes',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['difficulty', 'timeInSeconds', 'hintsUsed', 'mistakes'],
+                            properties: {
+                                difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'] },
+                                timeInSeconds: { type: 'integer' },
+                                hintsUsed: { type: 'integer' },
+                                mistakes: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Score calculated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            score: { type: 'integer' },
+                                            breakdown: { type: 'object' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/new-game': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Create new Rubik Cube',
+            description: 'Initialize solved Rubik Cube (2x2, 3x3, or 4x4)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                size: {
+                                    type: 'integer',
+                                    enum: [2, 3, 4],
+                                    default: 3,
+                                    example: 3,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Rubik Cube created',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    game: {
+                                        type: 'object',
+                                        properties: {
+                                            cube: {
+                                                type: 'object',
+                                                properties: {
+                                                    front: { type: 'array', items: { type: 'string' } },
+                                                    back: { type: 'array', items: { type: 'string' } },
+                                                    left: { type: 'array', items: { type: 'string' } },
+                                                    right: { type: 'array', items: { type: 'string' } },
+                                                    top: { type: 'array', items: { type: 'string' } },
+                                                    bottom: { type: 'array', items: { type: 'string' } },
+                                                },
+                                            },
+                                            size: { type: 'integer' },
+                                            moves: { type: 'array', items: { type: 'string' } },
+                                            solved: { type: 'boolean', example: true },
+                                            gameOver: { type: 'boolean' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/shuffle': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Shuffle Rubik Cube',
+            description: 'Generate random shuffle moves (F, B, L, R, U, D and their inverses)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                size: { type: 'integer', enum: [2, 3, 4], default: 3 },
+                                numMoves: { type: 'integer', default: 20, example: 20 },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Shuffle moves generated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    moves: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        example: ["F", "R'", "U", "B'", "L"],
+                                    },
+                                    message: { type: 'string' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/check-solved': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Check if Rubik Cube is solved',
+            description: 'Verify all faces have uniform colors',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['cube', 'size'],
+                            properties: {
+                                cube: { type: 'object' },
+                                size: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Check result',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    solved: { type: 'boolean' },
+                                    gameOver: { type: 'boolean' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/get-hint': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Get Rubik Cube hint',
+            description: 'Get suggested move to solve cube (simplified hint)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['cube', 'size'],
+                            properties: {
+                                cube: { type: 'object' },
+                                size: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Hint provided',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    hint: { type: 'string', example: 'F' },
+                                    message: { type: 'string' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/calculate-score': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Calculate Rubik Cube score',
+            description: 'Calculate score based on moves and time',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['size', 'moves', 'timeInSeconds', 'hintsUsed'],
+                            properties: {
+                                size: { type: 'integer', enum: [2, 3, 4] },
+                                moves: { type: 'integer' },
+                                timeInSeconds: { type: 'integer' },
+                                hintsUsed: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Score calculated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    score: { type: 'integer' },
+                                    breakdown: { type: 'object' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/rubik/validate-move': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Validate Rubik Cube move',
+            description: 'Check if move notation is valid',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['move'],
+                            properties: {
+                                move: { type: 'string', example: "F" },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Validation result',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    valid: { type: 'boolean' },
+                                    message: { type: 'string' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/caro/new-game': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Create new Caro game',
+            description: 'Initialize empty Caro board (15x15 or custom size)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                size: {
+                                    type: 'integer',
+                                    default: 15,
+                                    example: 15,
+                                    description: 'Board size (default 15x15)',
+                                },
+                                difficulty: {
+                                    type: 'string',
+                                    enum: ['easy', 'medium', 'hard'],
+                                    default: 'medium',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Caro game created',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    game: {
+                                        type: 'object',
+                                        properties: {
+                                            board: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'array',
+                                                    items: { type: 'string', nullable: true },
+                                                },
+                                            },
+                                            size: { type: 'integer' },
+                                            currentPlayer: { type: 'string', example: 'X' },
+                                            winner: { type: 'string', nullable: true },
+                                            gameOver: { type: 'boolean' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/caro/ai-move': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Get AI move for Caro',
+            description: 'AI calculates best move using Minimax with Alpha-Beta Pruning',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['board', 'size', 'difficulty'],
+                            properties: {
+                                board: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'array',
+                                        items: { type: 'string', nullable: true },
+                                    },
+                                },
+                                size: { type: 'integer' },
+                                difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'] },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'AI move calculated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    move: {
+                                        type: 'object',
+                                        properties: {
+                                            row: { type: 'integer' },
+                                            col: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/caro/check-winner': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Check Caro winner',
+            description: 'Check if there is a winner (5 in a row)',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['board', 'size'],
+                            properties: {
+                                board: { type: 'array' },
+                                size: { type: 'integer' },
+                                lastMove: {
+                                    type: 'object',
+                                    properties: {
+                                        row: { type: 'integer' },
+                                        col: { type: 'integer' },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Winner check result',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    winner: { type: 'string', nullable: true, example: 'X' },
+                                    winningLine: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'object',
+                                            properties: {
+                                                row: { type: 'integer' },
+                                                col: { type: 'integer' },
+                                            },
+                                        },
+                                    },
+                                    gameOver: { type: 'boolean' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    '/caro/calculate-score': {
+        post: {
+            tags: ['🎲 Puzzle & Strategy Games'],
+            summary: 'Calculate Caro score',
+            description: 'Calculate score based on result and difficulty',
+            requestBody: {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            required: ['winner', 'difficulty', 'moves'],
+                            properties: {
+                                winner: { type: 'string', enum: ['X', 'O', 'draw'] },
+                                difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'] },
+                                moves: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+            responses: {
+                '200': {
+                    description: 'Score calculated',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    score: { type: 'integer' },
+                                    breakdown: { type: 'object' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
 };
