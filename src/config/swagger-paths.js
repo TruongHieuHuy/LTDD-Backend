@@ -2160,4 +2160,137 @@ module.exports = {
             },
         },
     },
+
+    // ==================== USER SEARCH ENDPOINT ====================
+    '/users/search': {
+        get: {
+            tags: ['👤 Users'],
+            summary: 'Search users',
+            description: 'Search users by username or email (excludes self)',
+            security: [{ bearerAuth: [] }],
+            parameters: [
+                {
+                    name: 'query',
+                    in: 'query',
+                    required: true,
+                    schema: { type: 'string', minLength: 1 },
+                    description: 'Search term for username or email'
+                }
+            ],
+            responses: {
+                '200': {
+                    description: 'Search results',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'object',
+                                            properties: {
+                                                id: { type: 'string' },
+                                                username: { type: 'string' },
+                                                avatarUrl: { type: 'string' },
+                                                totalScore: { type: 'integer' }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    // ==================== ADMIN ENDPOINTS ====================
+    '/admin/stats': {
+        get: {
+            tags: ['👑 Admin'],
+            summary: 'Get admin dashboard statistics',
+            description: 'Get aggregated statistics for users, games, challenges, etc.',
+            security: [{ bearerAuth: [] }],
+            responses: {
+                '200': {
+                    description: 'Admin stats retrieved',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            totalUsers: { type: 'integer' },
+                                            totalGames: { type: 'integer' },
+                                            totalGameSessions: { type: 'integer' },
+                                            totalChallenges: { type: 'integer' },
+                                            totalPosts: { type: 'integer' },
+                                            totalFriendships: { type: 'integer' },
+                                            newUsers: { type: 'integer' },
+                                            topGames: { type: 'array' }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                '403': { description: 'Forbidden - Admin access required' }
+            }
+        }
+    },
+
+    '/admin/recent-activities': {
+        get: {
+            tags: ['👑 Admin'],
+            summary: 'Get recent activities',
+            description: 'Get recent platform activities for dashboard feed',
+            security: [{ bearerAuth: [] }],
+            parameters: [
+                {
+                    name: 'limit',
+                    in: 'query',
+                    schema: { type: 'integer', default: 10 }
+                }
+            ],
+            responses: {
+                '200': {
+                    description: 'Recent activities retrieved',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    success: { type: 'boolean' },
+                                    data: {
+                                        type: 'object',
+                                        properties: {
+                                            activities: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'object',
+                                                    properties: {
+                                                        type: { type: 'string' },
+                                                        message: { type: 'string' },
+                                                        timestamp: { type: 'string' },
+                                                        color: { type: 'string' }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
 };

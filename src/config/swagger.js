@@ -337,6 +337,7 @@ const options = {
             { name: '🏅 Achievements', description: 'Achievements and badges' },
             { name: '💬 Messages', description: 'P2P messaging system' },
             { name: '📤 Upload', description: 'File upload management' },
+            { name: '👑 Admin', description: 'Admin dashboard and management' },
         ],
     },
     apis: [], // We'll define paths directly in the definition
