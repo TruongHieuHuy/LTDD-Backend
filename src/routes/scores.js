@@ -330,12 +330,12 @@ router.get('/leaderboard', async (req, res) => {
 
     // Filter by game type
     if (gameType && gameType !== 'all') {
-      where.gameType = gameType.toUpperCase();
+      where.gameType = gameType.toLowerCase();
     }
 
     // Filter by difficulty
     if (difficulty && difficulty !== 'all') {
-      where.difficulty = difficulty.toUpperCase();
+      where.difficulty = difficulty.toLowerCase();
     }
 
     // Filter by time period
