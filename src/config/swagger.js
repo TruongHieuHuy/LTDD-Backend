@@ -29,12 +29,16 @@ const options = {
         },
         servers: [
             {
-                url: 'http://localhost:3000/api',
-                description: 'Development Server',
+                url: 'https://conditioning-merger-reflections-fighter.trycloudflare.com/api',
+                description: '🌐 Public Server (Cloudflare Tunnel)',
+            },
+            {
+                url: 'http://192.168.56.209:3000/api',
+                description: 'Local IP (LAN only)',
             },
             {
                 url: 'http://localhost:3000/api',
-                description: 'Production Server (update URL)',
+                description: 'Local Testing',
             },
         ],
         components: {
